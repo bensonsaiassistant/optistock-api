@@ -12,7 +12,7 @@ def day_sim_3(psl, ads, var, lt, p_terms, s_terms, days, demand_sample, lt_sampl
               cost_of_capital=0.14):
     """Run a day-by-day inventory simulation.
 
-    Returns: [avg_sales, avg_inventory, avg_ar, avg_ap, avg_deval]
+    Returns: [avg_sales, avg_inventory, avg_ar, avg_ap, avg_deval, avg_oos_days, avg_lost_sales]
     """
     deval_days = 548
     start_inv = max(psl, 1)
@@ -24,6 +24,8 @@ def day_sim_3(psl, ads, var, lt, p_terms, s_terms, days, demand_sample, lt_sampl
     ar = np.zeros(days, dtype=np.int64)
     ap = np.zeros(days, dtype=np.int64)
     deval = np.zeros(days, dtype=np.int64)
+    oos_days = np.zeros(days, dtype=np.int64)
+    lost_sales = np.zeros(days, dtype=np.int64)
     max_order_size = int64(round(ads * 2, 0))
 
     # Use pre-sampled demand if variance is high enough; otherwise Poisson
@@ -57,6 +59,11 @@ def day_sim_3(psl, ads, var, lt, p_terms, s_terms, days, demand_sample, lt_sampl
 
         # Sales
         sales[i] = min(demand[i], inventory[i])
+        if inventory[i] == 0 and demand[i] > 0:
+            oos_days[i] = 1
+            lost_sales[i] = demand[i]
+        elif demand[i] > inventory[i]:
+            lost_sales[i] = demand[i] - inventory[i]
 
         # Inventory update
         if i < days - 1:
@@ -91,14 +98,19 @@ def day_sim_3(psl, ads, var, lt, p_terms, s_terms, days, demand_sample, lt_sampl
     avg_ap = np.mean(ap[start_date:days])
     avg_sales = np.mean(sales[start_date:days])
     avg_deval = np.mean(deval[start_date:days])
+    avg_oos_days = np.mean(oos_days[start_date:days])
+    avg_lost_sales = np.mean(lost_sales[start_date:days])
 
-    return np.array([avg_sales, avg_inventory, avg_ar, avg_ap, avg_deval])
+    return np.array([avg_sales, avg_inventory, avg_ar, avg_ap, avg_deval, avg_oos_days, avg_lost_sales])
 
 
 @njit
 def calc_single_psl(psl, ads, var, lt, gm, cost, avg_sale_price, length, width, height,
                     p_terms, s_terms, min_of_1, cost_of_capital=0.14):
-    """Calculate profit metrics for a single PSL value."""
+    """Calculate profit metrics for a single PSL value.
+
+    Returns: [psl, profit, inventory, sales, cube, ppc, oos_days, lost_sales]
+    """
     invst_charge = cost_of_capital / 365
     days = 100000
     deval_days = 548
@@ -142,6 +154,8 @@ def calc_single_psl(psl, ads, var, lt, gm, cost, avg_sale_price, length, width, 
     sales = sim_result[0]
     inventory = sim_result[1]
     deval = sim_result[4]
+    oos_days_val = sim_result[5]
+    lost_sales_val = sim_result[6]
     cube = inventory * length * width * height
     avg_invest_acct = (sim_result[1] * cost) + (sim_result[2] * avg_sale_price) - (sim_result[3] * cost)
     profit = ((sim_result[0] * gm) - avg_invest_acct * invst_charge) - (deval * (cost / 2))
@@ -151,4 +165,4 @@ def calc_single_psl(psl, ads, var, lt, gm, cost, avg_sale_price, length, width, 
     else:
         ppc = 0
 
-    return np.array([float64(psl), profit, inventory, sales, cube, ppc])
+    return np.array([float64(psl), profit, inventory, sales, cube, ppc, float64(oos_days_val), float64(lost_sales_val)])

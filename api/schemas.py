@@ -68,3 +68,23 @@ class DemandResult(BaseModel):
 class DemandResponse(BaseModel):
     items: list[DemandResult]
     compute_time_ms: float
+
+
+class SimulateRequest(BaseModel):
+    """Run simulation directly with provided ads/var (no demand forecasting)."""
+    ads: float
+    variance: float
+    lead_time_days: float = 14.0
+    cost: float
+    sale_price: float
+    length: float = 1.0
+    width: float = 1.0
+    height: float = 1.0
+    payment_terms_days: int = 30
+    sales_terms_days: int = 30
+    cost_of_capital: float = 0.14
+    current_available: int = 0
+    on_order_qty: int = 0
+    back_order_qty: int = 0
+    order_frequency_days: int = 7
+    item_id: str = "direct"
