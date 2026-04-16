@@ -82,8 +82,8 @@ fastapi_app.include_router(router)
     cpu=1.0,              # 1 vCPU is plenty (sim runs in ~125ms for basic)
     memory=1024,          # 1 GB RAM (reduced from 2 GB)
     timeout=30,           # 30s max (requests never need 5 minutes)
-    keep_warm=0,          # Scale to zero when idle (no fixed cost)
-    concurrency_limit=4,  # Max 4 concurrent containers (prevent runaway scaling)
+    min_containers=0,     # Scale to zero when idle (no fixed cost)
+    max_containers=4,     # Max 4 concurrent containers (prevent runaway scaling)
     # ML models need to import ml-regression — mount it as a volume
     volumes={
         "/ml-regression": modal.Volume.from_name("ml-regression-vol", create_if_missing=True),
