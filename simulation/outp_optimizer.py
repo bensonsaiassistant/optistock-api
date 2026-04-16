@@ -206,9 +206,11 @@ def calc_opti_outp(
     days = sim_days
     lt_int = int(round(lt))
 
-    # Generate OUTP values to sweep (capped at 30 for speed)
-    outps_to_calc = int(max(1, ads) * max(1, lt) * 5)
-    outps_to_calc = min(outps_to_calc, 30)
+    # Generate OUTP values to sweep
+    # Expected demand during lead time = ads * lt, plus safety stock buffer
+    # We sweep from 1 to ~3x expected lead time demand
+    outps_to_calc = int(max(1, ads) * max(1, lt) * 3)
+    outps_to_calc = max(outps_to_calc, 1)  # ensure at least 1
     outp_values = np.arange(1, outps_to_calc + 1, dtype=np.float64)
 
     # Generate demand samples
