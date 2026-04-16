@@ -1,6 +1,13 @@
 """Day-level inventory simulation engine.
 
-Optimized for speed: uses scalar accumulation instead of per-day arrays.
+Optimized for speed using scalar accumulation (no per-day arrays) and Numba JIT.
+
+Inventory flow per day:
+1. **Demand** is sampled (Negative Binomial or Poisson).
+2. **Sales** = min(demand, inventory) — can't sell what you don't have.
+3. **Order** placed if inventory is below target (OUTP).
+4. **Receipts** arrive after lead time days.
+5. **Financials** track accounts receivable, payable, and devaluation.
 """
 
 import numpy as np
@@ -9,10 +16,13 @@ from numba import njit, int64, float64
 
 from .demand_dist import calc_nb_array_ln, numba_choice
 
+# Days before inventory devalues (≈ 18 months for Amazon FBA long-term storage)
+DEVAL_DAYS = 548
+
 
 @njit
-def day_sim_3(
-    psl: int64,
+def day_sim(
+    outp: int64,
     ads: float64,
     var: float64,
     lt: int64,
@@ -23,24 +33,42 @@ def day_sim_3(
     lt_sample: np.ndarray,
     cost_of_capital: float64 = 0.14,
 ) -> np.ndarray:
-    """Run a day-by-day inventory simulation.
+    """Run a day-by-day inventory simulation for one OUTP level.
 
-    Returns np.array([avg_sales, avg_inventory, avg_ar, avg_ap, avg_deval])
+    The simulation models daily demand, sales, ordering, receipts, and
+    financial tracking (accounts receivable, accounts payable, devaluation).
+
+    Parameters
+    ----------
+    outp : Order Up To Point — target inventory level to maintain.
+    ads : Average daily sales (mean demand).
+    var : Demand variance.
+    lt : Supplier lead time in days (integer).
+    p_terms : Payment terms — days until you pay your supplier.
+    s_terms : Sales terms — days until customers pay you.
+    days : Simulation horizon.
+    demand_sample : Pre-generated daily demand values (used when NB distribution applies).
+    lt_sample : Pre-generated daily lead-time values.
+    cost_of_capital : Annual cost-of-capital rate (e.g. 0.14 = 14%).
+
+    Returns
+    -------
+    np.array([avg_sales, avg_inventory, avg_ar, avg_ap, avg_deval])
+        All averages are computed over the post-warmup period.
     """
-    deval_days = 548
-    start_inv = max(psl, int64(1))
+    start_inv = max(outp, int64(1))
     max_order_size = max(int64(round(ads * 2, 0)), int64(1))
 
     use_pre_sampled = (ads / var < 0.95) and (var - ads > 0.1) if var > 0 else False
 
     # --- Scalar state variables ---
-    inv = int64(start_inv)
-    oo = int64(0)  # on_order
+    inv = int64(start_inv)       # current on-hand inventory
+    oo = int64(0)                # units on order (not yet received)
 
-    # Ring buffers for AR/AP tracking
-    ar_ring = np.zeros(366, dtype=np.int64)
-    ap_ring = np.zeros(366, dtype=np.int64)
-    inv_ring = np.zeros(550, dtype=np.int64)
+    # Ring buffers for AR/AP tracking (circular arrays to avoid shifting)
+    ar_ring = np.zeros(366, dtype=np.int64)  # accounts receivable ring
+    ap_ring = np.zeros(366, dtype=np.int64)  # accounts payable ring
+    inv_ring = np.zeros(550, dtype=np.int64)  # inventory snapshot ring
 
     # Running totals for post-warmup averaging
     sum_sales = float64(0.0)
@@ -54,51 +82,50 @@ def day_sim_3(
     ar_balance = int64(0)
     ap_balance = int64(0)
 
-    # Warmup period: skip first N days
+    # Warmup period: skip first N days (proportional to starting inventory)
     warmup_end = int64(start_inv) if ads > 0 else int64(0)
     warmup_end = min(warmup_end, days)
 
     for i in range(days):
-        # Demand
+        # 1. Demand
         if use_pre_sampled:
             demand = int64(demand_sample[i % demand_sample.size])
         else:
             demand = int64(np.random.poisson(ads)) if ads > 0 else int64(0)
 
-        # Sales (can't sell more than we have)
+        # 2. Sales — can't sell more than we have
         sold = min(demand, inv)
 
-        # Inventory update
+        # 3. Update inventory
         inv = max(inv - sold, int64(0))
 
-        # Order placement
-        order_qty = min(max(psl - inv - oo, int64(0)), max_order_size)
+        # 4. Order placement — replenish toward OUTP
+        order_qty = min(max(outp - inv - oo, int64(0)), max_order_size)
         oo += order_qty
 
-        # Receipts: orders arrive after 'lt' days
+        # 5. Receipts — orders arrive after 'lt' days
         if i >= lt:
-            # Receive what was ordered lt days ago (simplified: receive up to on_order)
             recv = min(oo, int64(1000000))
             inv += recv
             oo -= recv
 
-        # AR: customers pay after s_terms days
+        # 6. Accounts Receivable — customers pay after s_terms days
         ar_balance += sold
         ar_ring[i % 366] = sold
         if i >= s_terms:
             ar_balance -= ar_ring[(i - s_terms) % 366]
 
-        # AP: we pay after p_terms days
+        # 7. Accounts Payable — we pay supplier after p_terms days
         ap_ring[i % 366] = order_qty
         if i >= p_terms:
             ap_balance -= ap_ring[(i - p_terms) % 366]
 
-        # Devaluation: track inventory from deval_days ago
+        # 8. Devaluation — track inventory from deval_days ago
         inv_ring[i % 550] = inv
-        if i >= deval_days:
-            sum_deval += max(int64(0), inv_ring[(i - deval_days) % 550] - sold)
+        if i >= DEVAL_DAYS:
+            sum_deval += max(int64(0), inv_ring[(i - DEVAL_DAYS) % 550] - sold)
 
-        # Accumulate stats (post-warmup only)
+        # 9. Accumulate stats (post-warmup only)
         if i >= warmup_end:
             sum_sales += sold
             sum_inv += inv
@@ -116,64 +143,3 @@ def day_sim_3(
         sum_ap / count,
         sum_deval / count,
     ])
-
-
-@njit
-def calc_single_psl(
-    psl: int64,
-    ads: float64,
-    var: float64,
-    lt: float64,
-    gm: float64,
-    cost: float64,
-    avg_sale_price: float64,
-    length: float64,
-    width: float64,
-    height: float64,
-    p_terms: int64,
-    s_terms: int64,
-    min_of_1: int64,
-    cost_of_capital: float64 = 0.14,
-    lt_variance: float64 = 0.0,
-    sim_days: int64 = 200,
-) -> np.ndarray:
-    """Calculate profit metrics for a single PSL value."""
-    invst_charge = cost_of_capital / 365.0
-    days = sim_days
-    deval_days = 548
-
-    if ads <= 0 or var <= 0 or lt <= 0 or psl <= 0:
-        return np.array([float64(psl), 0.0, 0.0, 0.0, 0.0, 0.0])
-
-    # Generate demand samples
-    if (ads / var < 0.95) and (var - ads > 0.1):
-        demand_array = calc_nb_array_ln(ads, var)
-        demand_size = np.arange(demand_array.size)
-        n_to_sample = min(days, demand_array.size)
-        demand_sample = numba_choice(demand_size, demand_array, n_to_sample)
-    else:
-        demand_sample = np.zeros(1, dtype=np.int64)
-
-    # Generate lead time samples
-    lt_int = int64(round(lt))
-    lt_sample = np.full(days, lt_int, dtype=np.int64)
-
-    # Run simulation
-    sim_result = day_sim_3(
-        psl, ads, var, lt_int, p_terms, s_terms, days,
-        demand_sample, lt_sample, cost_of_capital,
-    )
-
-    sim_sales = sim_result[0]
-    inventory = sim_result[1]
-    deval = sim_result[4]
-    cube = inventory * length * width * height
-    avg_invest_acct = (sim_result[1] * cost) + (sim_result[2] * avg_sale_price) - (sim_result[3] * cost)
-    profit = ((sim_sales * gm) - avg_invest_acct * invst_charge) - (deval * (cost / 2) / deval_days)
-
-    if inventory > 0:
-        ppc = profit / cube
-    else:
-        ppc = 0.0
-
-    return np.array([float64(psl), profit, inventory, sim_sales, cube, ppc])

@@ -53,18 +53,18 @@ def warm_numba_functions():
     timings.append(("demand_dist.find_cdf_indexes", (time.time() - t0) * 1000))
 
     # ─── day_sim ────────────────────────────────────────────────────────────
-    from simulation.day_sim import day_sim_3, calc_single_psl
+    from simulation.day_sim import day_sim
 
     t0 = time.time()
 
-    # day_sim_3 — keep days small for warmup
+    # day_sim — keep days small for warmup
     # Condition: ads/var >= 0.95 triggers Poisson path (no demand_sample dependency)
     warmup_days = 100
     dummy_demand = np.zeros(warmup_days, dtype=np.int64)
     dummy_lt = np.full(warmup_days, 3, dtype=np.int64)  # 3-day lead time
 
-    day_sim_3(
-        psl=5,
+    day_sim(
+        outp=5,
         ads=2.0,
         var=2.0,
         lt=3,
@@ -75,11 +75,13 @@ def warm_numba_functions():
         lt_sample=dummy_lt,
         cost_of_capital=0.14,
     )
-    timings.append(("day_sim.day_sim_3", (time.time() - t0) * 1000))
+    timings.append(("day_sim.day_sim", (time.time() - t0) * 1000))
+
+    # ─── outp_optimizer ──────────────────────────────────────────────────────
+    from simulation.outp_optimizer import calc_opti_outp, get_all_outps
 
     t0 = time.time()
-    calc_single_psl(
-        psl=5,
+    calc_opti_outp(
         ads=2.0,
         var=2.0,
         lt=3.0,
@@ -94,32 +96,11 @@ def warm_numba_functions():
         min_of_1=0,
         cost_of_capital=0.14,
     )
-    timings.append(("day_sim.calc_single_psl", (time.time() - t0) * 1000))
-
-    # ─── psl_optimizer ──────────────────────────────────────────────────────
-    from simulation.psl_optimizer import calc_opti_psl_3, get_all_psls
-
-    t0 = time.time()
-    calc_opti_psl_3(
-        ads=2.0,
-        var=2.0,
-        lt=3.0,
-        gm=5.0,
-        cost=2.0,
-        avg_sale_price=10.0,
-        length=1.0,
-        width=1.0,
-        height=1.0,
-        p_terms=30,
-        s_terms=14,
-        min_of_1=0,
-        cost_of_capital=0.14,
-    )
-    timings.append(("psl_optimizer.calc_opti_psl_3", (time.time() - t0) * 1000))
+    timings.append(("outp_optimizer.calc_opti_outp", (time.time() - t0) * 1000))
 
     t0 = time.time()
     n_items = 2
-    get_all_psls(
+    get_all_outps(
         id_arr=np.arange(n_items),
         ads_arr=np.full(n_items, 2.0),
         var_arr=np.full(n_items, 2.0),
@@ -135,7 +116,7 @@ def warm_numba_functions():
         min_of_1_arr=np.zeros(n_items),
         cost_of_capital=0.14,
     )
-    timings.append(("psl_optimizer.get_all_psls", (time.time() - t0) * 1000))
+    timings.append(("outp_optimizer.get_all_outps", (time.time() - t0) * 1000))
 
     return timings
 

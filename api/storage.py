@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS request_items (
     lead_time_days REAL,
     historical_data_count INTEGER,
     -- Results
-    optimal_psl INTEGER,
+    optimal_outp INTEGER,
     recommended_order_qty INTEGER,
     expected_profit REAL,
     expected_daily_sales REAL,
@@ -239,9 +239,9 @@ async def store_request(
             sale_price = _check_finite(item_input.get("sale_price"), "sale_price")
             lead_time_days = _check_finite(item_input.get("lead_time_days"), "lead_time_days")
 
-            optimal_psl = item_result.get("optimal_psl")
-            if optimal_psl is not None:
-                optimal_psl = int(optimal_psl)
+            optimal_outp = item_result.get("optimal_outp")
+            if optimal_outp is not None:
+                optimal_outp = int(optimal_outp)
             recommended_order_qty = item_result.get("recommended_order_qty")
             if recommended_order_qty is not None:
                 recommended_order_qty = int(recommended_order_qty)
@@ -261,7 +261,7 @@ async def store_request(
                     (request_id, item_id, current_available, on_order_qty,
                      back_order_qty, order_frequency_days, cost, sale_price,
                      lead_time_days, historical_data_count,
-                     optimal_psl, recommended_order_qty, expected_profit,
+                     optimal_outp, recommended_order_qty, expected_profit,
                      expected_daily_sales, expected_avg_inventory,
                      cube_usage, profit_per_cube, demand_source, ads,
                      variance, warnings)
@@ -278,7 +278,7 @@ async def store_request(
                     sale_price,
                     lead_time_days,
                     historical_data_count,
-                    optimal_psl,
+                    optimal_outp,
                     recommended_order_qty,
                     expected_profit,
                     expected_daily_sales,
@@ -330,7 +330,7 @@ async def get_requests(
             SELECT ar.*, ri.item_id as ri_item_id, ri.current_available,
                    ri.on_order_qty, ri.back_order_qty, ri.order_frequency_days,
                    ri.cost, ri.sale_price, ri.lead_time_days,
-                   ri.historical_data_count, ri.optimal_psl,
+                   ri.historical_data_count, ri.optimal_outp,
                    ri.recommended_order_qty, ri.expected_profit,
                    ri.expected_daily_sales, ri.expected_avg_inventory,
                    ri.cube_usage, ri.profit_per_cube, ri.demand_source,
@@ -385,7 +385,7 @@ async def get_requests(
                     "sale_price": row["sale_price"],
                     "lead_time_days": row["lead_time_days"],
                     "historical_data_count": row["historical_data_count"],
-                    "optimal_psl": row["optimal_psl"],
+                    "optimal_outp": row["optimal_outp"],
                     "recommended_order_qty": row["recommended_order_qty"],
                     "expected_profit": row["expected_profit"],
                     "expected_daily_sales": row["expected_daily_sales"],

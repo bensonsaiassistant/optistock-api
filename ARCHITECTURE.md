@@ -4,21 +4,21 @@
 
 OptiStock is a paid API hosted on [Modal](https://modal.com) that calculates profit-maximizing purchase quantities for inventory items. It combines **demand forecasting** (moving averages + ML regression) with **Monte Carlo simulation** optimization to recommend how many units of each item to order right now.
 
-The core insight: the simulation computes an optimal *order-up-to* stock level (PSL), and the API translates that into an actionable *order quantity* by factoring in current inventory positions.
+The core insight: the simulation computes an optimal *order-up-to* stock level (OUTP), and the API translates that into an actionable *order quantity* by factoring in current inventory positions.
 
 ---
 
 ## Key Design Decisions
 
-### 1. PSL = Order Up To Point
+### 1. OUTP = Order Up To Point
 
-The simulation engine outputs an **optimal PSL** (Periodic Stock Level) — the total inventory ceiling to target. The API then derives the actionable order quantity:
+The simulation engine outputs an **optimal OUTP** (Order Up To Point) — the total inventory ceiling to target. The API then derives the actionable order quantity:
 
 ```
-recommended_order_qty = max(0, optimal_psl - current_available - on_order_qty + back_order_qty)
+recommended_order_qty = max(0, optimal_outp - current_available - on_order_qty + back_order_qty)
 ```
 
-This means the customer doesn't need to understand PSL; they get a "how many to buy now" number directly.
+This means the customer doesn't need to understand OUTP; they get a "how many to buy now" number directly.
 
 ### 2. Order Frequency
 
@@ -122,7 +122,7 @@ All endpoints require a valid API key passed via the `X-API-Key` header. Validat
   "items": [
     {
       "item_id": "string",
-      "optimal_psl": 150,
+      "optimal_outp": 150,
       "recommended_order_qty": 50,
       "expected_profit": 1234.56,
       "expected_daily_sales": 5.2,
@@ -141,9 +141,9 @@ All endpoints require a valid API key passed via the `X-API-Key` header. Validat
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `optimal_psl` | int | Simulated optimal order-up-to level |
-| `recommended_order_qty` | int | `max(0, optimal_psl - available - on_order + back_order)` |
-| `expected_profit` | float | Expected profit at optimal PSL |
+| `optimal_outp` | int | Simulated optimal order-up-to level |
+| `recommended_order_qty` | int | `max(0, optimal_outp - available - on_order + back_order)` |
+| `expected_profit` | float | Expected profit at optimal OUTP |
 | `expected_daily_sales` | float | Predicted average daily sales |
 | `expected_avg_inventory` | float | Expected average inventory level |
 | `cube_usage` | float | Expected average cubic volume occupied |
@@ -168,9 +168,9 @@ All endpoints require a valid API key passed via the `X-API-Key` header. Validat
 │  │  FORECAST     │     │  (Monte Carlo)│     │  CALCULATION      │  │
 │  └──────────────┘     └───────────────┘     └────────────────────┘  │
 │         │                     │                      │               │
-│    ┌────┴────┐          calc_opti_psl_3     max(0, psl - avail     │
+│    ┌────┴────┐          calc_opti_outp_3     max(0, outp - avail     │
 │    │         │                │              - on_order + back)     │
-│  basic    premium        optimal_psl                                   │
+│  basic    premium        optimal_outp                                   │
 │    │         │                │                      │               │
 │    ▼         ▼                ▼                      ▼               │
 │  final_avg  ads          expected_profit      recommended_order_qty  │
@@ -191,21 +191,21 @@ Both paths output `(ads, variance, demand_source)`.
 
 ### Step 2: Monte Carlo Simulation
 
-Run `calc_opti_psl_3(ads, variance, cost, sale_price, ...)` which:
+Run `calc_opti_outp_3(ads, variance, cost, sale_price, ...)` which:
 1. Fits a negative binomial distribution to `(ads, variance)` using log-space `neg_bin_ln`
-2. Simulates daily demand over the order cycle via `day_sim_3`
-3. Sweeps candidate PSL values to find the one maximizing expected profit
-4. Returns optimal PSL, expected profit, average inventory, and other metrics
+2. Simulates daily demand over the order cycle via `day_sim`
+3. Sweeps candidate OUTP values to find the one maximizing expected profit
+4. Returns optimal OUTP, expected profit, average inventory, and other metrics
 
 ### Step 3: Order Quantity Calculation
 
-Translate the abstract PSL into a concrete order recommendation:
+Translate the abstract OUTP into a concrete order recommendation:
 
 ```
-recommended_order_qty = max(0, optimal_psl - current_available - on_order_qty + back_order_qty)
+recommended_order_qty = max(0, optimal_outp - current_available - on_order_qty + back_order_qty)
 ```
 
-If the current position already exceeds the optimal PSL, the recommendation is zero (don't order).
+If the current position already exceeds the optimal OUTP, the recommendation is zero (don't order).
 
 ---
 
@@ -228,12 +228,12 @@ Client Request
 │              │               │ (ads, variance)
 │              │               ▼
 │              │    ┌──────────────────────────────────┐
-│              │    │ simulation/psl_optimizer.py        │
-│              │    │   calc_opti_psl_3()               │
+│              │    │ simulation/outp_optimizer.py        │
+│              │    │   calc_opti_outp_3()               │
 │              │    │     ├── demand_dist.py (neg_bin_ln)│
-│              │    │     └── day_sim.py (day_sim_3)     │
+│              │    │     └── day_sim.py (day_sim)     │
 │              │    └──────────┬───────────────────────┘
-│              │               │ (optimal_psl, metrics)
+│              │               │ (optimal_outp, metrics)
 │              │               ▼
 │              │    recommended_order_qty calculation
 │              │               │
@@ -253,8 +253,8 @@ optistock-api/
 ├── simulation/
 │   ├── __init__.py
 │   ├── demand_dist.py       # neg_bin_ln, calc_nb_array_ln, numba_choice
-│   ├── day_sim.py           # day_sim_3
-│   └── psl_optimizer.py     # calc_opti_psl_3, get_all_psls, calc_single_psl
+│   ├── day_sim.py           # day_sim
+│   └── outp_optimizer.py     # calc_opti_outp_3, get_all_outps, calc_single_outp
 ├── demand/
 │   ├── adjusted_demand.py   # calculate_adjusted_demand (cleaned up)
 │   └── ml_predictor.py      # Wrapper for ml-regression predictions
@@ -274,8 +274,8 @@ optistock-api/
 |--------|--------------|---------|
 | `modal_app.py` | FastAPI app, Modal decorators | Entry point; deploys to Modal |
 | `simulation/demand_dist.py` | `neg_bin_ln`, `calc_nb_array_ln`, `numba_choice` | Negative binomial distribution in log-space; Numba-accelerated sampling |
-| `simulation/day_sim.py` | `day_sim_3` | Simulates daily demand over an order cycle |
-| `simulation/psl_optimizer.py` | `calc_opti_psl_3`, `get_all_psls`, `calc_single_psl` | Finds optimal PSL by sweeping candidate levels; `get_all_psls` parallelizes across items |
+| `simulation/day_sim.py` | `day_sim` | Simulates daily demand over an order cycle |
+| `simulation/outp_optimizer.py` | `calc_opti_outp_3`, `get_all_outps`, `calc_single_outp` | Finds optimal OUTP by sweeping candidate levels; `get_all_outps` parallelizes across items |
 | `demand/adjusted_demand.py` | `calculate_adjusted_demand` | Moving-average demand forecaster → `final_avg`, `final_var` |
 | `demand/ml_predictor.py` | `predict` | Wrapper calling ml-regression (XGBoost/BayesianRidge) for premium tier |
 | `api/schemas.py` | Pydantic models | Request/response validation |
@@ -287,7 +287,7 @@ optistock-api/
 ## Numba + Modal Considerations
 
 - **JIT warmup:** All `@njit` functions are slow on first call (~2–5s each). Cold starts on Modal will incur this penalty.
-- **Batch efficiency:** Use `get_all_psls()` to parallelize across items in a single request, amortizing warmup cost.
+- **Batch efficiency:** Use `get_all_outps()` to parallelize across items in a single request, amortizing warmup cost.
 - **Modal image:** Python 3.11 + numpy + numba + pandas + xgboost + fastapi.
 - **Warming strategy:** Consider a `/warmup` endpoint or Modal lifecycle hook to trigger JIT compilation before production traffic arrives.
 

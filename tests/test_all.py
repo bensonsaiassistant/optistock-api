@@ -57,11 +57,11 @@ def test_find_cdf_indexes():
 import simulation.day_sim as ds
 
 
-def test_day_sim_3_returns_length_5():
+def test_day_sim_returns_length_5():
     lt_sample = np.ones(100, dtype=np.int64)
     demand_sample = np.ones(100, dtype=np.int64)
-    result = ds.day_sim_3(
-        psl=10, ads=10, var=5, lt=14,
+    result = ds.day_sim(
+        outp=10, ads=10, var=5, lt=14,
         p_terms=30, s_terms=30, days=100,
         demand_sample=demand_sample, lt_sample=lt_sample,
         cost_of_capital=0.14
@@ -69,23 +69,11 @@ def test_day_sim_3_returns_length_5():
     assert len(result) == 5
 
 
-def test_calc_single_psl_returns_length_6():
-    result = ds.calc_single_psl(
-        psl=20, ads=10, var=5, lt=14,
-        gm=25.0, cost=50.0, avg_sale_price=75.0,
-        length=1.0, width=1.0, height=1.0,
-        p_terms=30, s_terms=30, min_of_1=1,
-        cost_of_capital=0.14
-    )
-    assert len(result) == 6
-    assert result[0] == 20
-
-
 def test_day_sim_poisson_demand_no_error():
     lt_sample = np.full(50, 14, dtype=np.int64)
     demand_sample = np.zeros(50, dtype=np.int64)
-    result = ds.day_sim_3(
-        psl=15, ads=10, var=5, lt=14,
+    result = ds.day_sim(
+        outp=15, ads=10, var=5, lt=14,
         p_terms=30, s_terms=30, days=50,
         demand_sample=demand_sample, lt_sample=lt_sample,
         cost_of_capital=0.14
@@ -98,8 +86,8 @@ def test_day_sim_nb_demand_no_error():
     demand_size = np.arange(demand_array.size)
     demand_sample = dd.numba_choice(demand_size, demand_array, 50)
     lt_sample = np.full(50, 14, dtype=np.int64)
-    result = ds.day_sim_3(
-        psl=15, ads=5, var=10, lt=14,
+    result = ds.day_sim(
+        outp=15, ads=5, var=10, lt=14,
         p_terms=30, s_terms=30, days=50,
         demand_sample=demand_sample, lt_sample=lt_sample,
         cost_of_capital=0.14
@@ -107,12 +95,12 @@ def test_day_sim_nb_demand_no_error():
     assert len(result) == 5
 
 
-# --- 3. PSL OPTIMIZER ---------------------------------------------------------
-import simulation.psl_optimizer as psl
+# --- 3. OUTP OPTIMIZER ---------------------------------------------------------
+import simulation.outp_optimizer as outp
 
 
-def test_calc_opti_psl_3_returns_6_elements():
-    result = psl.calc_opti_psl_3(
+def test_calc_opti_outp_returns_6_elements():
+    result = outp.calc_opti_outp(
         ads=5.0, var=10.0, lt=14,
         gm=25.0, cost=50.0, avg_sale_price=75.0,
         length=1.0, width=1.0, height=1.0,
@@ -123,7 +111,7 @@ def test_calc_opti_psl_3_returns_6_elements():
     assert result[0] > 0
 
 
-def test_get_all_psls_shape():
+def test_get_all_outps_shape():
     ids = np.array([0, 1, 2], dtype=np.int64)
     ads_arr = np.array([5.0, 6.0, 7.0], dtype=np.float64)
     var_arr = np.array([10.0, 10.0, 10.0], dtype=np.float64)
@@ -138,7 +126,7 @@ def test_get_all_psls_shape():
     sterms = np.array([30, 30, 30], dtype=np.int64)
     min1 = np.array([1, 1, 1], dtype=np.int64)
 
-    result = psl.get_all_psls(
+    result = outp.get_all_outps(
         ids, ads_arr, var_arr, lt_arr, gm_arr, cost_arr,
         sale_arr, length_arr, width_arr, height_arr,
         pterms, sterms, min1, cost_of_capital=0.14
@@ -147,14 +135,14 @@ def test_get_all_psls_shape():
 
 
 def test_higher_gross_margin_higher_profit():
-    r_low = psl.calc_opti_psl_3(
+    r_low = outp.calc_opti_outp(
         ads=8.0, var=5.0, lt=14,
         gm=5.0, cost=50.0, avg_sale_price=55.0,
         length=1.0, width=1.0, height=1.0,
         p_terms=30, s_terms=30, min_of_1=1,
         cost_of_capital=0.14
     )
-    r_high = psl.calc_opti_psl_3(
+    r_high = outp.calc_opti_outp(
         ads=8.0, var=5.0, lt=14,
         gm=30.0, cost=50.0, avg_sale_price=80.0,
         length=1.0, width=1.0, height=1.0,
@@ -165,14 +153,14 @@ def test_higher_gross_margin_higher_profit():
 
 
 def test_cost_of_capital_affects_result():
-    r_low_coc = psl.calc_opti_psl_3(
+    r_low_coc = outp.calc_opti_outp(
         ads=8.0, var=5.0, lt=14,
         gm=25.0, cost=50.0, avg_sale_price=75.0,
         length=1.0, width=1.0, height=1.0,
         p_terms=30, s_terms=30, min_of_1=1,
         cost_of_capital=0.05
     )
-    r_high_coc = psl.calc_opti_psl_3(
+    r_high_coc = outp.calc_opti_outp(
         ads=8.0, var=5.0, lt=14,
         gm=25.0, cost=50.0, avg_sale_price=75.0,
         length=1.0, width=1.0, height=1.0,
@@ -348,16 +336,16 @@ def test_calculate_demand_insufficient_data():
     assert ads == 0.0
 
 
-def test_run_psl_optimization_returns_6_values():
-    result = routes.run_psl_optimization(
+def test_run_outp_optimization_returns_6_values():
+    result = routes.run_outp_optimization(
         ads=10.0, var=5.0, lt=14.0,
         gm=15.0, cost=50.0, sale_price=65.0,
         length=1.0, width=1.0, height=1.0,
         p_terms=30, s_terms=30, cost_of_capital=0.14,
     )
     assert len(result) == 6
-    psl_val, profit, inv, sales, cube, ppc = result
-    assert psl_val >= 0
+    outp_val, profit, inv, sales, cube, ppc = result
+    assert outp_val >= 0
 
 
 def test_health_endpoint():

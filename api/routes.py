@@ -159,16 +159,16 @@ def _calculate_elite_demand_and_lt(item) -> tuple[float, float, float, float, st
         return ads, var, lt, lt_var, demand_source, lt_source
 
 
-def run_psl_optimization(
+def run_outp_optimization(
     ads: float, var: float, lt: float, gm: float, cost: float,
     sale_price: float, length: float, width: float, height: float,
     p_terms: int, s_terms: int, cost_of_capital: float,
     lt_variance: float = 0.0,
 ) -> tuple:
-    """Run the PSL optimization simulation."""
-    from simulation.psl_optimizer import calc_opti_psl_3
+    """Run the OUTP (Order Up To Point) optimization simulation."""
+    from simulation.outp_optimizer import calc_opti_outp
 
-    result = calc_opti_psl_3(
+    result = calc_opti_outp(
         ads=ads, var=var, lt=lt, gm=gm, cost=cost,
         avg_sale_price=sale_price, length=length, width=width, height=height,
         p_terms=p_terms, s_terms=s_terms, min_of_1=1,
@@ -191,7 +191,7 @@ def run_single_item(item, tier: str, cost_of_capital: float) -> ItemResult:
         if ads <= 0:
             warnings.append(f"No demand data available (lead_time_source: {lt_source})")
             return ItemResult(
-                item_id=item.item_id, optimal_psl=0, recommended_order_qty=0,
+                item_id=item.item_id, optimal_outp=0, recommended_order_qty=0,
                 expected_profit=0, expected_daily_sales=0, expected_avg_inventory=0,
                 cube_usage=0, profit_per_cube=0, demand_source=demand_source,
                 ads=ads, variance=var, warnings=warnings,
@@ -206,7 +206,7 @@ def run_single_item(item, tier: str, cost_of_capital: float) -> ItemResult:
         if ads <= 0:
             warnings.append("No demand data available")
             return ItemResult(
-                item_id=item.item_id, optimal_psl=0, recommended_order_qty=0,
+                item_id=item.item_id, optimal_outp=0, recommended_order_qty=0,
                 expected_profit=0, expected_daily_sales=0, expected_avg_inventory=0,
                 cube_usage=0, profit_per_cube=0, demand_source=demand_source,
                 ads=ads, variance=var, warnings=warnings,
@@ -216,13 +216,13 @@ def run_single_item(item, tier: str, cost_of_capital: float) -> ItemResult:
     if gm <= 0:
         warnings.append("Negative or zero gross margin")
         return ItemResult(
-            item_id=item.item_id, optimal_psl=0, recommended_order_qty=0,
+            item_id=item.item_id, optimal_outp=0, recommended_order_qty=0,
             expected_profit=0, expected_daily_sales=0, expected_avg_inventory=0,
             cube_usage=0, profit_per_cube=0, demand_source=demand_source,
             ads=ads, variance=var, warnings=warnings,
         )
 
-    optimal_psl, profit, inventory, sales, cube, ppc = run_psl_optimization(
+    optimal_outp, profit, inventory, sales, cube, ppc = run_outp_optimization(
         ads=ads, var=var, lt=lt, gm=gm, cost=item.cost,
         sale_price=item.sale_price, length=item.length, width=item.width,
         height=item.height, p_terms=item.payment_terms_days,
@@ -233,12 +233,12 @@ def run_single_item(item, tier: str, cost_of_capital: float) -> ItemResult:
 
     recommended_qty = max(
         0,
-        optimal_psl - item.current_available - item.on_order_qty + item.back_order_qty,
+        optimal_outp - item.current_available - item.on_order_qty + item.back_order_qty,
     )
 
     return ItemResult(
         item_id=item.item_id,
-        optimal_psl=optimal_psl,
+        optimal_outp=optimal_outp,
         recommended_order_qty=recommended_qty,
         expected_profit=profit,
         expected_daily_sales=sales,
@@ -252,11 +252,11 @@ def run_single_item(item, tier: str, cost_of_capital: float) -> ItemResult:
     )
 
 
-def run_batch_psl_optimization(
+def run_batch_outp_optimization(
     items: list, tier: str, cost_of_capital: float,
 ) -> list[ItemResult]:
-    """Optimize multiple items in parallel using get_all_psls (njit parallel)."""
-    from simulation.psl_optimizer import get_all_psls
+    """Optimize multiple items in parallel using get_all_outps (njit parallel)."""
+    from simulation.outp_optimizer import get_all_outps
 
     n = len(items)
     ads_arr = np.zeros(n)
@@ -298,7 +298,7 @@ def run_batch_psl_optimization(
         pterms_arr[i] = item.payment_terms_days
         sterms_arr[i] = item.sales_terms_days
 
-    results = get_all_psls(
+    results = get_all_outps(
         np.arange(n), ads_arr, var_arr, lt_arr, gm_arr, cost_arr,
         avg_sale_price_arr, length_arr, width_arr, height_arr,
         pterms_arr, sterms_arr, min_of_1_arr, cost_of_capital,
@@ -308,7 +308,7 @@ def run_batch_psl_optimization(
     item_results = []
     for i, item in enumerate(items):
         optimal_idx = int(results[i, 0])
-        optimal_psl = optimal_idx + 1
+        optimal_outp = optimal_idx + 1
         profit = float(results[i, 1])
         inventory = float(results[i, 2])
         sales = float(results[i, 3])
@@ -317,12 +317,12 @@ def run_batch_psl_optimization(
 
         recommended_qty = max(
             0,
-            optimal_psl - item.current_available - item.on_order_qty + item.back_order_qty,
+            optimal_outp - item.current_available - item.on_order_qty + item.back_order_qty,
         )
 
         item_results.append(ItemResult(
             item_id=item.item_id,
-            optimal_psl=optimal_psl,
+            optimal_outp=optimal_outp,
             recommended_order_qty=recommended_qty,
             expected_profit=profit,
             expected_daily_sales=sales,
@@ -349,7 +349,7 @@ async def optimize(
     start_time = time.time()
 
     if len(request.items) >= BATCH_THRESHOLD:
-        results = run_batch_psl_optimization(
+        results = run_batch_outp_optimization(
             request.items, request.tier, request.cost_of_capital,
         )
     else:
@@ -469,7 +469,7 @@ async def simulate(
     """Run simulation directly with provided ads/var (no demand forecasting)."""
     check_body_size(request)
     gm = request.sale_price - request.cost
-    optimal_psl, profit, inventory, sales, cube, ppc = run_psl_optimization(
+    optimal_outp, profit, inventory, sales, cube, ppc = run_outp_optimization(
         ads=request.ads, var=request.variance, lt=request.lead_time_days, gm=gm,
         cost=request.cost, sale_price=request.sale_price,
         length=request.length, width=request.width, height=request.height,
@@ -479,12 +479,12 @@ async def simulate(
 
     recommended_qty = max(
         0,
-        optimal_psl - request.current_available - request.on_order_qty + request.back_order_qty,
+        optimal_outp - request.current_available - request.on_order_qty + request.back_order_qty,
     )
 
     return ItemResult(
         item_id=request.item_id,
-        optimal_psl=optimal_psl,
+        optimal_outp=optimal_outp,
         recommended_order_qty=recommended_qty,
         expected_profit=profit,
         expected_daily_sales=sales,

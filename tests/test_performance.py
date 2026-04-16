@@ -15,7 +15,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from api.schemas import ItemInput, HistoricalDataPoint, OptimizeRequest
-from api.routes import run_single_item, run_batch_psl_optimization, run_psl_optimization
+from api.routes import run_single_item, run_batch_outp_optimization, run_outp_optimization
 
 # ─── Realistic Data Generator ───────────────────────────────────────────────
 
@@ -157,13 +157,13 @@ def test_tier_comparison():
         results[tier] = (result, elapsed)
 
         print(f"\n  {tier.upper()} tier ({elapsed:.0f}ms):")
-        print(f"    PSL={result.optimal_psl}, Order={result.recommended_order_qty}, "
+        print(f"    OUTP={result.optimal_outp}, Order={result.recommended_order_qty}, "
               f"Profit=${result.expected_profit:.2f}/day")
         print(f"    ADS={result.ads:.2f}, Var={result.variance:.2f}, Source={result.demand_source}")
 
-    # Validate: all tiers should produce positive PSL for positive demand
-    passed = all(r.optimal_psl > 0 for r, _ in results.values())
-    print(f"\n  ✅ All tiers produce positive PSL" if passed else "  ❌ Some tier produced zero PSL")
+    # Validate: all tiers should produce positive OUTP for positive demand
+    passed = all(r.optimal_outp > 0 for r, _ in results.values())
+    print(f"\n  ✅ All tiers produce positive OUTP" if passed else "  ❌ Some tier produced zero OUTP")
     return passed
 
 
@@ -190,21 +190,21 @@ def test_batch_optimization():
 
         # Warm up numba for first batch call
         t0 = time.perf_counter()
-        results = run_batch_psl_optimization(items, "basic", 0.14)
+        results = run_batch_outp_optimization(items, "basic", 0.14)
         elapsed = (time.perf_counter() - t0) * 1000
 
         print(f"\n  Batch size {size} ({elapsed:.0f}ms):")
         for r in results:
-            print(f"    {r.item_id}: PSL={r.optimal_psl}, Order={r.recommended_order_qty}, "
+            print(f"    {r.item_id}: OUTP={r.optimal_outp}, Order={r.recommended_order_qty}, "
                   f"Profit=${r.expected_profit:.2f}/day")
 
-        # Validate: all items with demand should have positive PSL
+        # Validate: all items with demand should have positive OUTP
         nonzero = [r for r in results if r.ads > 0]
-        if not all(r.optimal_psl > 0 for r in nonzero):
-            print(f"  ❌ Some items with demand got zero PSL in batch {size}")
+        if not all(r.optimal_outp > 0 for r in nonzero):
+            print(f"  ❌ Some items with demand got zero OUTP in batch {size}")
             passed = False
         else:
-            print(f"  ✅ All items with demand have positive PSL")
+            print(f"  ✅ All items with demand have positive OUTP")
 
     return passed
 
@@ -217,20 +217,20 @@ def test_profit_maximization():
 
     passed = True
 
-    # Test 1: Higher margin → higher PSL (relative to demand)
+    # Test 1: Higher margin → higher OUTP (relative to demand)
     hm_item = make_item("high_margin")   # 80% margin, demand=5
     lm_item = make_item("low_margin")    # 10% margin, demand=20
 
     hm_result = run_single_item(hm_item, "basic", 0.14)
     lm_result = run_single_item(lm_item, "basic", 0.14)
 
-    # Compare PSL/demand ratio (how many days of cover)
-    hm_cover = hm_result.optimal_psl / max(hm_result.ads, 0.1)
-    lm_cover = lm_result.optimal_psl / max(lm_result.ads, 0.1)
+    # Compare OUTP/demand ratio (how many days of cover)
+    hm_cover = hm_result.optimal_outp / max(hm_result.ads, 0.1)
+    lm_cover = lm_result.optimal_outp / max(lm_result.ads, 0.1)
 
-    print(f"\n  High margin (80%): PSL={hm_result.optimal_psl}, ADS={hm_result.ads:.1f}, "
+    print(f"\n  High margin (80%): OUTP={hm_result.optimal_outp}, ADS={hm_result.ads:.1f}, "
           f"cover={hm_cover:.0f} days")
-    print(f"  Low margin (10%):  PSL={lm_result.optimal_psl}, ADS={lm_result.ads:.1f}, "
+    print(f"  Low margin (10%):  OUTP={lm_result.optimal_outp}, ADS={lm_result.ads:.1f}, "
           f"cover={lm_cover:.0f} days")
 
     # High margin should get relatively more coverage
@@ -243,15 +243,15 @@ def test_profit_maximization():
     low_cap = run_single_item(make_item("medium_volume"), "basic", 0.05)
     high_cap = run_single_item(make_item("medium_volume"), "basic", 0.30)
 
-    print(f"\n  Cost of capital 5%:  PSL={low_cap.optimal_psl}, Profit=${low_cap.expected_profit:.2f}")
-    print(f"  Cost of capital 30%: PSL={high_cap.optimal_psl}, Profit=${high_cap.expected_profit:.2f}")
+    print(f"\n  Cost of capital 5%:  OUTP={low_cap.optimal_outp}, Profit=${low_cap.expected_profit:.2f}")
+    print(f"  Cost of capital 30%: OUTP={high_cap.optimal_outp}, Profit=${high_cap.expected_profit:.2f}")
 
-    if high_cap.optimal_psl < low_cap.optimal_psl:
+    if high_cap.optimal_outp < low_cap.optimal_outp:
         print(f"  ✅ Higher cost of capital → leaner inventory")
-    elif high_cap.optimal_psl == low_cap.optimal_psl:
+    elif high_cap.optimal_outp == low_cap.optimal_outp:
         print(f"  ⚠️  No difference (may be within tolerance)")
     else:
-        print(f"  ❌ Higher cost of capital should reduce PSL")
+        print(f"  ❌ Higher cost of capital should reduce OUTP")
         passed = False
 
     # Test 3: Profit is positive for all normal items
@@ -283,12 +283,12 @@ def test_edge_cases():
         ],
     )
     zr = run_single_item(zero_item, "basic", 0.14)
-    print(f"\n  Zero demand: PSL={zr.optimal_psl}, Order={zr.recommended_order_qty}, "
+    print(f"\n  Zero demand: OUTP={zr.optimal_outp}, Order={zr.recommended_order_qty}, "
           f"Warnings={zr.warnings}")
-    if zr.optimal_psl == 0 or "No demand" in str(zr.warnings):
+    if zr.optimal_outp == 0 or "No demand" in str(zr.warnings):
         print(f"  ✅ Zero demand handled correctly")
     else:
-        print(f"  ❌ Zero demand should produce zero PSL or warning")
+        print(f"  ❌ Zero demand should produce zero OUTP or warning")
         passed = False
 
     # Negative margin
@@ -300,22 +300,22 @@ def test_edge_cases():
         ],
     )
     nr = run_single_item(neg_item, "basic", 0.14)
-    print(f"\n  Negative margin: PSL={nr.optimal_psl}, Order={nr.recommended_order_qty}, "
+    print(f"\n  Negative margin: OUTP={nr.optimal_outp}, Order={nr.recommended_order_qty}, "
           f"Warnings={nr.warnings}")
-    if nr.optimal_psl == 0 or "Negative" in str(nr.warnings):
+    if nr.optimal_outp == 0 or "Negative" in str(nr.warnings):
         print(f"  ✅ Negative margin handled correctly")
     else:
-        print(f"  ❌ Negative margin should produce zero PSL or warning")
+        print(f"  ❌ Negative margin should produce zero OUTP or warning")
         passed = False
 
     # Very high demand
     high_item = create_item_profile("very_high", base_demand=200, lt=14, cost=5.0, sale_price=8.0, seed=99)
     hr = run_single_item(high_item, "basic", 0.14)
-    print(f"\n  Very high demand (200/day): PSL={hr.optimal_psl}, Order={hr.recommended_order_qty}")
-    if hr.optimal_psl > 0 and hr.expected_profit > 0:
+    print(f"\n  Very high demand (200/day): OUTP={hr.optimal_outp}, Order={hr.recommended_order_qty}")
+    if hr.optimal_outp > 0 and hr.expected_profit > 0:
         print(f"  ✅ High demand handled correctly")
     else:
-        print(f"  ❌ High demand should produce positive PSL and profit")
+        print(f"  ❌ High demand should produce positive OUTP and profit")
         passed = False
 
     return passed
@@ -333,7 +333,7 @@ def test_performance_benchmarks():
 
     # Cold start: import + first call
     t0 = time.perf_counter()
-    from simulation.psl_optimizer import calc_opti_psl_3
+    from simulation.outp_optimizer import calc_opti_outp
     item = make_item("medium_volume")
     result = run_single_item(item, "basic", 0.14)
     cold_start = (time.perf_counter() - t0) * 1000
@@ -360,7 +360,7 @@ def test_performance_benchmarks():
             items.append(extras[len(items) - len(all_keys)])
 
         t0 = time.perf_counter()
-        run_batch_psl_optimization(items, "basic", 0.14)
+        run_batch_outp_optimization(items, "basic", 0.14)
         elapsed = (time.perf_counter() - t0) * 1000
         print(f"  Batch ({size} items): {elapsed:.0f}ms")
 

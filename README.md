@@ -50,7 +50,7 @@ curl -X POST http://localhost:8000/v1/optimize \
 {
   "items": [{
     "item_id": "SKU-001",
-    "optimal_psl": 112,
+    "optimal_outp": 112,
     "recommended_order_qty": 42,
     "expected_profit": 487.32,
     "expected_daily_sales": 5.2,
@@ -222,20 +222,20 @@ The engine runs 100,000 days of simulated inventory operations:
 2. **Lead times** are sampled from a Gamma distribution (parameterized by predicted lead time and its variance for elite tier, or a hardcoded exponent for basic/premium)
 3. **Financials** track accounts receivable (sales terms), accounts payable (payment terms), inventory holding cost (cost of capital), and devaluation (products losing value after 548 days)
 
-### Step 3: PSL Sweep
+### Step 3: OUTP Sweep
 
-The optimizer tries every reasonable Profit Stacking Level (PSL) — the target inventory level you're trying to maintain. For each PSL, it runs the simulation and calculates:
+The optimizer tries every reasonable Order Up To Point (OUTP) — the target inventory level you're trying to maintain. For each OUTP, it runs the simulation and calculates:
 
 ```
 profit = (daily_sales × gross_margin) − (avg_inventory × cost × capital_rate/365) − devaluation_loss
 ```
 
-The PSL that maximizes profit is selected. Early stopping kicks in when profits consistently decline.
+The OUTP that maximizes profit is selected. Early stopping kicks in when profits consistently decline.
 
 ### Step 4: Order Recommendation
 
 ```
-recommended_order_qty = max(0, optimal_psl − current_available − on_order_qty + back_order_qty)
+recommended_order_qty = max(0, optimal_outp − current_available − on_order_qty + back_order_qty)
 ```
 
 This accounts for what you already have, what's coming, and what's already promised to customers.
@@ -265,7 +265,7 @@ When you send 3+ items, the API automatically switches to parallel batch mode us
 
 ### What Happens with Insufficient Data
 
-- **Below 7 days:** Returns `demand_source: "insufficient_data"`, PSL = 0
+- **Below 7 days:** Returns `demand_source: "insufficient_data"`, OUTP = 0
 - **7–59 days (premium/elite):** Falls back to basic tier (rolling averages)
 - **ML deviation guardrail breached:** Falls back to basic tier automatically
 - **No historical lead times (elite):** Uses provided `lead_time_days` with default variance
@@ -362,7 +362,7 @@ optistock-api/
 ├── simulation/
 │   ├── demand_dist.py     # Negative binomial + Poisson distributions (Numba)
 │   ├── day_sim.py         # Daily Monte Carlo simulation (Numba JIT)
-│   └── psl_optimizer.py   # PSL sweep optimizer (Numba parallel)
+│   └── outp_optimizer.py   # OUTP sweep optimizer (Numba parallel)
 ├── scripts/
 │   └── warm_numba.py      # Pre-compile Numba functions for cold start
 ├── tests/

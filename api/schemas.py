@@ -240,7 +240,7 @@ class OptimizeRequest(BaseModel):
 
 class ItemResult(BaseModel):
     item_id: str
-    optimal_psl: int
+    optimal_outp: int
     recommended_order_qty: int
     expected_profit: float
     expected_daily_sales: float
