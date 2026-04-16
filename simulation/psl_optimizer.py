@@ -16,11 +16,8 @@ lt_var_expon = 1.3
 
 @njit
 def calc_opti_psl_3(ads, var, lt, gm, cost, avg_sale_price, length, width, height,
-                    p_terms, s_terms, min_of_1, cost_of_capital=0.14, oos_penalty=0.0):
+                    p_terms, s_terms, min_of_1, cost_of_capital=0.14):
     """Find optimal PSL by sweeping levels.
-
-    Args:
-        oos_penalty: penalty multiplier per avg OOS day (default 0.0, subtracted from profit)
 
     Returns: [optimal_psl_index, profit, inventory, sales, cube, ppc]
     """
@@ -76,15 +73,12 @@ def calc_opti_psl_3(ads, var, lt, gm, cost, avg_sale_price, length, width, heigh
         sales_arr[i] = sim_result[0]
         inventory_arr[i] = sim_result[1]
         deval_arr[i] = sim_result[4]
-        avg_oos_days = sim_result[5]
-        avg_lost_sales = sim_result[6]
 
         avg_invest_acct = (sim_result[1] * cost) + (sim_result[2] * avg_sale_price) - (sim_result[3] * cost)
         cube_arr[i] = inventory_arr[i] * length * width * height
 
-        # Profit formula with capital cost and OOS penalty
-        oos_penalty_cost = oos_penalty * avg_oos_days
-        profit_arr[i] = ((sim_result[0] * gm) - avg_invest_acct * invst_charge) - (deval_arr[i] * ((cost / 2)) / deval_days) - oos_penalty_cost
+        # Profit formula with capital cost
+        profit_arr[i] = ((sim_result[0] * gm) - avg_invest_acct * invst_charge) - (deval_arr[i] * ((cost / 2)) / deval_days)
 
         # Calculate profit per cube
         if inventory_arr[i] >= 0:
