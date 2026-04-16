@@ -1,12 +1,12 @@
 """PSL optimizer — finds optimal Profit Sharing Level.
 
-Optimized for speed:
-- Pre-generates random samples in pure numpy (outside JIT)
-- Uses JIT-compiled inner loop for PSL sweep
-- Python wrapper handles sample generation
-- Default sim_days=200, max 30 PSL levels — fast but accurate
+Architecture:
+- `_calc_opti_psl_3_inner` is @njit — sweeps PSL levels for one item (JIT-compiled)
+- `calc_opti_psl_3` is Python wrapper — generates random samples, calls JIT inner
+- `get_all_psls` uses ThreadPoolExecutor — parallel across items, JIT inside each thread
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 import numpy as np
@@ -186,6 +186,24 @@ def calc_opti_psl_3(
     return results[best_idx]
 
 
+def _optimize_single_item(args):
+    """Helper for parallel batch optimization. Runs one item's optimization."""
+    (i, ads, var, lt, gm, cost, sale_price, length, width, height,
+     p_terms, s_terms, min_of_1, coc, lt_var) = args
+
+    if ads <= 0 or lt <= 0 or gm <= 0:
+        if min_of_1 == 0:
+            return i, np.zeros(6)
+        return i, np.array([1.0, 0.0, 1.0, 0.0, 0.0, 0.0])
+
+    result = calc_opti_psl_3(
+        ads, var, lt, gm, cost, sale_price,
+        length, width, height,
+        p_terms, s_terms, min_of_1, coc, lt_var,
+    )
+    return i, result
+
+
 def get_all_psls(
     id_arr: np.ndarray,
     ads_arr: np.ndarray,
@@ -202,28 +220,37 @@ def get_all_psls(
     min_of_1_arr: np.ndarray,
     cost_of_capital: float = 0.14,
     lt_var_arr: Optional[np.ndarray] = None,
+    max_workers: int = 4,
 ) -> np.ndarray:
-    """Batch version of calc_opti_psl_3. Runs each item sequentially but fast."""
+    """Batch version of calc_opti_psl_3 with parallel execution.
+
+    Uses ThreadPoolExecutor — Numba releases the GIL during JIT computation,
+    so threads run in parallel on multiple cores.
+
+    Parameters
+    ----------
+    max_workers : Number of parallel threads (default 4)
+    """
     n = id_arr.size
     result_arr = np.zeros((n, 6))
-    run_on_row = (ads_arr > 0.0) & (lt_arr > 0.0) & (gm_arr > 0.0)
 
+    # Build argument tuples for each item
+    tasks = []
     for i in range(n):
-        if run_on_row[i]:
-            lt_var = 0.0
-            if lt_var_arr is not None:
-                lt_var = lt_var_arr[i]
-            result_line = calc_opti_psl_3(
-                ads_arr[i], var_arr[i], lt_arr[i], gm_arr[i], cost_arr[i],
-                avg_sale_price_arr[i], length_arr[i], width_arr[i], height_arr[i],
-                int(pterms_arr[i]), int(sterms_arr[i]), int(min_of_1_arr[i]),
-                cost_of_capital, lt_var,
-            )
-        elif min_of_1_arr[i] == 0:
-            result_line = np.zeros(6)
-        else:
-            result_line = np.array([1.0, 0.0, 1.0, 0.0, 0.0, 0.0])
+        lt_var = 0.0
+        if lt_var_arr is not None:
+            lt_var = lt_var_arr[i]
+        tasks.append((
+            i,
+            ads_arr[i], var_arr[i], lt_arr[i], gm_arr[i], cost_arr[i],
+            avg_sale_price_arr[i], length_arr[i], width_arr[i], height_arr[i],
+            int(pterms_arr[i]), int(sterms_arr[i]), int(min_of_1_arr[i]),
+            cost_of_capital, lt_var,
+        ))
 
-        result_arr[i, :] = result_line
+    # Run in parallel (Numba JIT releases GIL, so threads are truly parallel)
+    with ThreadPoolExecutor(max_workers=min(max_workers, n)) as executor:
+        for i, result in executor.map(_optimize_single_item, tasks):
+            result_arr[i, :] = result
 
     return result_arr
