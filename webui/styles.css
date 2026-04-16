@@ -47,6 +47,7 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);line-height:
 .form-row input,.form-row select,.form-row textarea{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:.95rem;font-family:var(--font);background:var(--bg);color:var(--text);transition:border-color .2s}
 .form-row input:focus,.form-row select:focus,.form-row textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
 .form-row-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
 .result-card{background:var(--bg-alt);border-radius:8px;padding:16px;margin-bottom:12px;border-left:4px solid var(--primary)}
 .result-card h4{font-size:.8rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px}
 .result-card .value{font-size:1.5rem;font-weight:700;color:var(--primary)}
@@ -88,4 +89,4 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);line-height:
 .cta-section .btn-primary{background:#fff;color:var(--primary)}
 .cta-section .btn-primary:hover{background:var(--bg-alt)}
 .footer{padding:24px;text-align:center;color:var(--text-muted);font-size:.85rem;border-top:1px solid var(--border)}
-@media(max-width:768px){.nav-links{display:none}.nav-links.open{display:flex;flex-direction:column;position:absolute;top:64px;left:0;right:0;background:var(--bg);padding:16px 24px;box-shadow:var(--shadow-lg);gap:12px}.nav-toggle{display:block}.demo-grid{grid-template-columns:1fr}.form-row-2{grid-template-columns:1fr}.result-grid{grid-template-columns:1fr}.hero-stats{gap:24px}.pricing-grid{grid-template-columns:1fr}}
+@media(max-width:768px){.nav-links{display:none}.nav-links.open{display:flex;flex-direction:column;position:absolute;top:64px;left:0;right:0;background:var(--bg);padding:16px 24px;box-shadow:var(--shadow-lg);gap:12px}.nav-toggle{display:block}.demo-grid{grid-template-columns:1fr}.form-row-2{grid-template-columns:1fr}.form-row-3{grid-template-columns:1fr}.result-grid{grid-template-columns:1fr}.hero-stats{gap:24px}.pricing-grid{grid-template-columns:1fr}}

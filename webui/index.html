@@ -117,9 +117,43 @@
                             <input type="number" id="demo-order-freq" value="7" min="1">
                         </div>
                     </div>
+                    <div class="form-row-3">
+                        <div class="form-row">
+                            <label>Length (units)</label>
+                            <input type="number" id="demo-length" value="1.0" step="0.1" min="0">
+                        </div>
+                        <div class="form-row">
+                            <label>Width (units)</label>
+                            <input type="number" id="demo-width" value="1.0" step="0.1" min="0">
+                        </div>
+                        <div class="form-row">
+                            <label>Height (units)</label>
+                            <input type="number" id="demo-height" value="1.0" step="0.1" min="0">
+                        </div>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="form-row">
+                            <label>Back Order Qty</label>
+                            <input type="number" id="demo-back-order" value="0" min="0">
+                        </div>
+                        <div class="form-row">
+                            <label>Cost of Capital (%)</label>
+                            <input type="number" id="demo-coc" value="14" step="0.5" min="0" max="100">
+                        </div>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="form-row">
+                            <label>Payment Terms (days)</label>
+                            <input type="number" id="demo-payment-terms" value="30" min="0">
+                        </div>
+                        <div class="form-row">
+                            <label>Sales Terms (days)</label>
+                            <input type="number" id="demo-sales-terms" value="30" min="0">
+                        </div>
+                    </div>
                     <div class="form-row">
                         <label>Historical Daily Sales (comma-separated numbers)</label>
-                        <textarea id="demo-historical" rows="6">5, 7, 3, 8, 6, 4, 9, 7, 5, 6, 8, 3, 7, 5, 4, 6, 8, 7, 5, 9, 6, 4, 7, 5, 8, 6, 3, 7, 5, 4, 6, 8, 7, 5, 9, 6, 4, 7, 5, 8</textarea>
+                        <textarea id="demo-historical" rows="4">5, 7, 3, 8, 6, 4, 9, 7, 5, 6, 8, 3, 7, 5, 4, 6, 8, 7, 5, 9, 6, 4, 7, 5, 8, 6, 3, 7, 5, 4, 6, 8, 7, 5, 9, 6, 4, 7, 5, 8</textarea>
                     </div>
                     <div class="form-row">
                         <label>Tier</label>
@@ -127,11 +161,7 @@
                             <option value="basic" selected>Basic (Rolling Averages)</option>
                             <option value="premium">Premium (ML + XGBoost)</option>
                             <option value="elite">Elite (ML Demand + ML Lead Time)</option>
-                    </select>
-                </div>
-                    <div class="form-row">
-                        <label>API Key</label>
-                        <input type="text" id="demo-api-key" placeholder="Enter your API key (or leave blank for demo mode)">
+                        </select>
                     </div>
                     <button id="demo-btn" class="btn btn-primary btn-full" onclick="runDemo()">Optimize Now</button>
                 </div>

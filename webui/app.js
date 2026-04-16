@@ -90,11 +90,17 @@
         const price = parseFloat(document.getElementById('demo-price').value) || 29.99;
         const stock = parseInt(document.getElementById('demo-stock').value) || 150;
         const onOrder = parseInt(document.getElementById('demo-on-order').value) || 0;
+        const backOrder = parseInt(document.getElementById('demo-back-order').value) || 0;
         const leadTime = parseInt(document.getElementById('demo-lead-time').value) || 14;
         const orderFreq = parseInt(document.getElementById('demo-order-freq').value) || 7;
+        const coc = parseFloat(document.getElementById('demo-coc').value) || 14;
+        const length = parseFloat(document.getElementById('demo-length').value) || 1.0;
+        const width = parseFloat(document.getElementById('demo-width').value) || 1.0;
+        const height = parseFloat(document.getElementById('demo-height').value) || 1.0;
+        const paymentTerms = parseInt(document.getElementById('demo-payment-terms').value) || 30;
+        const salesTerms = parseInt(document.getElementById('demo-sales-terms').value) || 30;
         const tier = document.getElementById('demo-tier').value || 'basic';
         const historicalRaw = document.getElementById('demo-historical').value;
-        const apiKey = document.getElementById('demo-api-key')?.value?.trim() || '';
 
         // Parse historical data
         let historicalData;
@@ -126,18 +132,18 @@
                 sale_price: price,
                 current_available: stock,
                 on_order_qty: onOrder,
-                back_order_qty: 0,
+                back_order_qty: backOrder,
                 lead_time_days: leadTime,
                 order_frequency_days: orderFreq,
-                payment_terms_days: 30,
-                sales_terms_days: 30,
-                length: 1.0,
-                width: 1.0,
-                height: 1.0,
+                payment_terms_days: paymentTerms,
+                sales_terms_days: salesTerms,
+                length: length,
+                width: width,
+                height: height,
                 historical_data: historicalData
             }],
             tier: tier,
-            cost_of_capital: 0.14
+            cost_of_capital: coc / 100  // convert percentage to decimal
         };
 
         // Show loading
@@ -149,8 +155,7 @@
             const response = await fetch(`${API_BASE}/v1/optimize`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    ...(apiKey && { 'X-API-Key': apiKey })
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(requestBody)
             });
