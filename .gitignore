@@ -1,1 +1,3 @@
 ml_regression_polars_data/
+__pycache__/
+*.pyc

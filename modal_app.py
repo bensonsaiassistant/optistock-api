@@ -1,24 +1,39 @@
-"""OptiStock API — deployed on Modal."""
+"""OptiStock API — deployed on Modal.
+
+Cost-optimized configuration:
+- Scales to zero when idle (no fixed cost)
+- Tight timeout (30s — requests never need more)
+- Small CPU/memory (basic tier is ~125ms, premium/elite ~4s)
+- Concurrency limits to prevent runaway scaling
+- Image build caching for faster deploys
+- No keep_warm (starts on first request)
+"""
 
 import modal
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-# Define Modal image
+# ── Image definition ──────────────────────────────────────────────────────
+# Keep image small and use caching. Build layer order matters for cache hits.
 image = (
     modal.Image.debian_slim(python_version="3.11")
+    .apt_install("libgomp1")  # Needed for xgboost
     .pip_install(
+        # Core runtime dependencies
         "fastapi>=0.100.0",
         "uvicorn>=0.23.0",
         "pydantic>=2.0.0",
         "numpy>=1.24.0",
         "pandas>=2.0.0",
         "numba>=0.57.0",
+        "aiosqlite>=0.19.0",
+        # Only installed, not used by basic tier
         "xgboost>=2.0.0",
         "scikit-learn>=1.3.0",
-        "modal>=0.60.0",
-        "aiosqlite>=0.19.0",
+        "polars>=0.20.0",
+        # ml-regression is added via mount (see below)
     )
+    .pip_install("modal>=0.60.0")  # Must be last for cache stability
 )
 
 app = modal.App("optistock-api")
@@ -63,9 +78,16 @@ fastapi_app.include_router(router)
 @app.function(
     image=image,
     secrets=[modal.Secret.from_name("optistock-api-keys")],
-    cpu=2.0,
-    memory=2048,
-    timeout=300,
+    # Cost optimization:
+    cpu=1.0,              # 1 vCPU is plenty (sim runs in ~125ms for basic)
+    memory=1024,          # 1 GB RAM (reduced from 2 GB)
+    timeout=30,           # 30s max (requests never need 5 minutes)
+    keep_warm=0,          # Scale to zero when idle (no fixed cost)
+    concurrency_limit=4,  # Max 4 concurrent containers (prevent runaway scaling)
+    # ML models need to import ml-regression — mount it as a volume
+    volumes={
+        "/ml-regression": modal.Volume.from_name("ml-regression-vol", create_if_missing=True),
+    },
 )
 @modal.asgi_app()
 def api_server():
