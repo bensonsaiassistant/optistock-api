@@ -75,6 +75,57 @@ CREATE TABLE IF NOT EXISTS request_items (
 CREATE INDEX IF NOT EXISTS idx_requests_timestamp ON api_requests(timestamp);
 CREATE INDEX IF NOT EXISTS idx_items_request_id ON request_items(request_id);
 CREATE INDEX IF NOT EXISTS idx_items_item_id ON request_items(item_id);
+
+-- User management tables (OptiStock SaaS)
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    is_verified INTEGER NOT NULL DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    subscription_tier TEXT NOT NULL DEFAULT 'free',
+    stripe_customer_id TEXT,
+    stripe_subscription_id TEXT,
+    api_usage_count INTEGER NOT NULL DEFAULT 0,
+    api_usage_limit INTEGER NOT NULL DEFAULT 100,
+    reset_token TEXT,
+    reset_token_expiry TEXT
+);
+
+CREATE TABLE IF NOT EXISTS api_keys (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    name TEXT NOT NULL DEFAULT '',
+    key_hash TEXT UNIQUE NOT NULL,
+    created_at TEXT NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS email_verifications (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    token TEXT UNIQUE NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    is_used INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS password_resets (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    token TEXT UNIQUE NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    is_used INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id);
+CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
+CREATE INDEX IF NOT EXISTS idx_email_verifications_token ON email_verifications(token);
+CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(token);
 """
 
 
@@ -103,14 +154,23 @@ def _check_finite(value, field: str) -> float | None:
 
 
 def _cap_raw_request(data: dict) -> str:
-    """Serialize to JSON, truncating if it exceeds the max size."""
-    raw = json.dumps(data, default=str)
+    """Serialize to JSON, truncating if it exceeds the max size.
+
+    Truncation can produce invalid JSON, so we validate the result
+    and return a safe placeholder if it fails.
+    """
+    try:
+        raw = json.dumps(data, default=str)
+    except (TypeError, ValueError, OverflowError) as e:
+        # Cannot serialize the request data — return minimal placeholder
+        return json.dumps({"error": "serialization_failed", "reason": str(e)})
+
     if len(raw) > _MAX_RAW_REQUEST_BYTES:
         raw = raw[:_MAX_RAW_REQUEST_BYTES]
-        # try to keep valid JSON by stripping the trailing truncation
+        # Try to keep valid JSON; if truncation breaks it, return placeholder
         try:
             json.loads(raw)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, UnicodeDecodeError):
             raw = json.dumps({"error": "truncated", "note": "request exceeded size limit"})
     return raw
 

@@ -10,23 +10,22 @@ Cost-optimized configuration:
 
 import modal
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, StaticFiles
+from fastapi import FastAPI
 from fastapi.responses import FileResponse
+from starlette.staticfiles import StaticFiles
 import pathlib
 
 app = modal.App("optistock-api")
 
 # ── Project root ──────────────────────────────────────────────────────────
 PROJECT_ROOT = pathlib.Path(__file__).parent
+WEBUI_DIR = pathlib.Path(__file__).parent / "webui"
 
 # ── Image definition ──────────────────────────────────────────────────────
-# Build image with dependencies + project source code baked in.
-# add_local_python_source copies Python packages into the image.
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("libgomp1")  # Needed for xgboost
     .pip_install(
-        # Core runtime dependencies
         "fastapi>=0.100.0",
         "uvicorn>=0.23.0",
         "pydantic>=2.0.0",
@@ -34,20 +33,25 @@ image = (
         "pandas>=2.0.0",
         "numba>=0.57.0",
         "aiosqlite>=0.19.0",
-        # ML tier dependencies
         "xgboost>=2.0.0",
         "scikit-learn>=1.3.0",
         "polars>=0.20.0",
-        # Modal itself
         "modal>=0.60.0",
+        "bcrypt>=4.0.0",
+        "pyjwt>=2.0.0",
+        "email-validator>=2.0.0",
     )
-    # Bake the project's Python packages into the image
-    # This copies api/, demand/, simulation/, scripts/ as importable modules
     .add_local_python_source(
         "api", "demand", "simulation", "scripts",
         copy=True,
     )
+    .add_local_dir(
+        WEBUI_DIR,
+        remote_path="/root/webui",
+    )
 )
+
+CONTAINER_WEBUI = pathlib.Path("/root/webui")
 
 
 def warmup_numba():
@@ -63,57 +67,44 @@ async def lifespan(fastapi_app: FastAPI):
     """Initialize storage DB on startup, close on shutdown."""
     from api import storage
     await storage.init_db()
-
-    # Warm up Numba JIT-compiled functions to avoid cold-start latency
     print("Warming up Numba JIT functions…")
     warmup_numba()
-
     yield
     await storage.close_db()
 
 
-# Create the FastAPI app with lifespan hooks
 fastapi_app = FastAPI(
     title="OptiStock API",
     version="0.1.0",
     lifespan=lifespan,
 )
 
-# Import and mount routes
+# Mount API routes
 from api.routes import router, register_security_handlers
+from api.user_routes import router as user_router
 
 register_security_handlers(fastapi_app)
 fastapi_app.include_router(router)
-
-# ── Static file serving for the web UI ───────────────────────────
-fastapi_app.mount("/static", StaticFiles(directory=str(PROJECT_ROOT / "webui")), name="static")
-
-
-@fastapi_app.get("/")
-async def serve_index():
-    """Serve the OptiStock web UI landing page."""
-    return FileResponse(str(PROJECT_ROOT / "webui" / "index.html"))
-
+fastapi_app.include_router(user_router)
 
 @app.function(
     image=image,
     secrets=[modal.Secret.from_name("optistock-api-keys")],
-    # Cost optimization:
-    cpu=1.0,              # 1 vCPU is plenty (sim runs in ~125ms for basic)
-    memory=1024,          # 1 GB RAM (reduced from 2 GB)
-    timeout=30,           # 30s max (requests never need 5 minutes)
-    min_containers=0,     # Scale to zero when idle (no fixed cost)
-    max_containers=4,     # Max 4 concurrent containers (prevent runaway scaling)
-    # ML models need to import ml-regression — mount it as a volume
+    cpu=1.0,
+    memory=1024,
+    timeout=30,
+    min_containers=0,
+    max_containers=4,
     volumes={
         "/ml-regression": modal.Volume.from_name("ml-regression-vol", create_if_missing=True),
     },
 )
 @modal.asgi_app()
 def api_server():
-    """Serve the full FastAPI app on Modal.
-
-    All routes (POST /v1/optimize, POST /v1/demand, POST /v1/simulate,
-    GET /health, GET /v1/requests) are handled by the FastAPI app.
-    """
+    """Serve the full FastAPI app on Modal."""
+    # Mount web UI static files (deferred to container runtime)
+    fastapi_app.mount("/static", StaticFiles(directory=str(CONTAINER_WEBUI)), name="static")
+    @fastapi_app.get("/")
+    async def serve_index():
+        return FileResponse(str(CONTAINER_WEBUI / "index.html"))
     return fastapi_app
