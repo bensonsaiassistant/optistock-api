@@ -99,8 +99,10 @@ fastapi_app.include_router(billing_router)
     timeout=30,
     min_containers=0,
     max_containers=4,
+    env={"OPTISTOCK_DB_PATH": "/root/data/optistock.db"},
     volumes={
         "/ml-regression": modal.Volume.from_name("ml-regression-vol", create_if_missing=True),
+        "/root/data": modal.Volume.from_name("optistock-data-vol", create_if_missing=True),
     },
 )
 @modal.asgi_app()

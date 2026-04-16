@@ -192,7 +192,10 @@ async def init_db(db_path: Optional[str] = None) -> aiosqlite.Connection:
     if db_path is not None:
         _db_path = db_path
     if _db_path is None:
-        _db_path = os.path.join(os.path.dirname(__file__), "..", "optistock.db")
+        _db_path = os.environ.get(
+            "OPTISTOCK_DB_PATH",
+            os.path.join(os.path.dirname(__file__), "..", "optistock.db"),
+        )
 
     if _db is not None:
         return _db
