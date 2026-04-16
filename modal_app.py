@@ -54,8 +54,9 @@ fastapi_app = FastAPI(
 )
 
 # Import and mount routes
-from api.routes import router
+from api.routes import router, register_security_handlers
 
+register_security_handlers(fastapi_app)
 fastapi_app.include_router(router)
 
 

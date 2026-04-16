@@ -1,12 +1,14 @@
 """Demand distribution utilities — log-space Negative Binomial & Poisson PMFs."""
 
+from typing import Tuple
+
 import numpy as np
 import math as m
 from numba import njit, prange, int64, float64
 
 
 @njit
-def neg_bin_ln(qty, r, p):
+def neg_bin_ln(qty: float64, r: float64, p: float64) -> float64:
     """Log-space Negative Binomial PMF (from sim2.py)."""
     log_result = (m.lgamma(qty + r) - m.lgamma(qty + 1) - m.lgamma(r)
                   + (r * m.log(p)) + (qty * m.log(1 - p)))
@@ -14,14 +16,14 @@ def neg_bin_ln(qty, r, p):
 
 
 @njit
-def poisson_pmf(k, lambd):
+def poisson_pmf(k: float64, lambd: float64) -> float64:
     """Log-space Poisson PMF (from sim2.py)."""
     log_result = k * m.log(lambd) - lambd - m.lgamma(k + 1)
     return log_result
 
 
 @njit
-def calc_nb_array_ln(mean, var):
+def calc_nb_array_ln(mean: float64, var: float64) -> np.ndarray:
     """Build a Negative Binomial (or Poisson fallback) probability array in log-space.
 
     Returns a 1-D array of probabilities that sums to 1.0.
@@ -60,41 +62,53 @@ def calc_nb_array_ln(mean, var):
 
 
 @njit
-def numba_choice(population, weights, k):
-    """Weighted random sampling with replacement (without duplicates)."""
+def numba_choice(population: np.ndarray, weights: np.ndarray, k: int64) -> np.ndarray:
+    """Weighted random sampling WITH replacement.
+
+    Parameters
+    ----------
+    population : array of values to sample from
+    weights : probability weights (must sum > 0)
+    k : number of samples
+
+    Returns
+    -------
+    Array of length k with sampled values.
+    """
     wc = np.cumsum(weights)
     m_ = wc[-1]
+    n_pop = population.shape[0]
     sample = np.empty(k, population.dtype)
-    sample_idx = np.full(k, -1, np.int32)
-    i = 0
-    while i < k:
+    for i in range(k):
         r = m_ * np.random.rand()
         idx = np.searchsorted(wc, r, side='right')
-        # Check index was not selected before
-        for j in range(i):
-            if sample_idx[j] == idx:
-                continue
+        idx = min(idx, n_pop - 1)  # clamp to valid range
         sample[i] = population[idx]
-        sample_idx[i] = population[idx]
-        i += 1
     return sample
 
 
 @njit
-def find_cdf_indexes(pdf, x):
+def find_cdf_indexes(pdf: np.ndarray, x: np.ndarray) -> np.ndarray:
     """Return interpolated CDF index values for each quantile target in x."""
     cdf = np.cumsum(pdf)
-    cdf /= cdf[-1]
+    total = cdf[-1]
+    # Guard against zero-sum PDF
+    if total <= 0.0:
+        return np.zeros_like(x, dtype=np.float64)
+    cdf = cdf / total
     result = np.empty_like(x, dtype=np.float64)
     for i in range(x.shape[0]):
         index = np.searchsorted(cdf, x[i])
         if index == 0:
             result[i] = 0.0
-        elif index == len(pdf):
+        elif index >= len(pdf):
             result[i] = float(index - 1)
         else:
             left_cdf = cdf[index - 1]
             right_cdf = cdf[index]
-            interp_index = index - 1 + (x[i] - left_cdf) / (right_cdf - left_cdf)
-            result[i] = interp_index
+            denom = right_cdf - left_cdf
+            if denom == 0.0:
+                result[i] = float(index - 1)
+            else:
+                result[i] = (index - 1) + (x[i] - left_cdf) / denom
     return result

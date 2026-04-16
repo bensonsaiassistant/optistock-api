@@ -263,3 +263,40 @@ def predict_demand_ml(
             f"Falling back to adjusted_demand."
         )
         return baseline_ads, baseline_var, "adjusted_demand"
+
+
+def predict_demand_and_lt_ml(
+    historical_data: list[dict],
+    item_id: str,
+    historical_lead_times: Optional[list[float]] = None,
+    min_data_points: int = MIN_DATA_POINTS,
+) -> tuple[float, float, float, float, str, str]:
+    """Predict BOTH demand AND lead time using ml-regression (elite tier).
+
+    Args:
+        historical_data: List of dicts with 'date', 'quantity', etc.
+        item_id: Item identifier.
+        historical_lead_times: Past lead time observations (in days). May be None.
+        min_data_points: Minimum data points for ML prediction.
+
+    Returns:
+        (ads, variance, lt_estimate, lt_variance, demand_source, lt_source)
+    """
+    # --- Predict demand ---
+    demand_ads, demand_var, demand_source = predict_demand_ml(
+        historical_data, item_id, min_data_points,
+    )
+
+    # --- Predict lead time ---
+    if historical_lead_times and len(historical_lead_times) > 0:
+        from demand.lt_predictor import predict_lead_time_ml
+        lt_estimate, lt_variance, lt_source = predict_lead_time_ml(
+            historical_lead_times, item_id, min_data_points,
+        )
+    else:
+        # No lead time data provided — fall back to default
+        lt_estimate = 14.0
+        lt_variance = 1.3
+        lt_source = "default"
+
+    return demand_ads, demand_var, lt_estimate, lt_variance, demand_source, lt_source
