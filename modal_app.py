@@ -5,16 +5,22 @@ Cost-optimized configuration:
 - Tight timeout (30s — requests never need more)
 - Small CPU/memory (basic tier is ~125ms, premium/elite ~4s)
 - Concurrency limits to prevent runaway scaling
-- Image build caching for faster deploys
-- No keep_warm (starts on first request)
+- Source code baked into the image (no mount issues)
 """
 
 import modal
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+import pathlib
+
+app = modal.App("optistock-api")
+
+# ── Project root ──────────────────────────────────────────────────────────
+PROJECT_ROOT = pathlib.Path(__file__).parent
 
 # ── Image definition ──────────────────────────────────────────────────────
-# Keep image small and use caching. Build layer order matters for cache hits.
+# Build image with dependencies + project source code baked in.
+# add_local_python_source copies Python packages into the image.
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("libgomp1")  # Needed for xgboost
@@ -27,16 +33,20 @@ image = (
         "pandas>=2.0.0",
         "numba>=0.57.0",
         "aiosqlite>=0.19.0",
-        # Only installed, not used by basic tier
+        # ML tier dependencies
         "xgboost>=2.0.0",
         "scikit-learn>=1.3.0",
         "polars>=0.20.0",
-        # ml-regression is added via mount (see below)
+        # Modal itself
+        "modal>=0.60.0",
     )
-    .pip_install("modal>=0.60.0")  # Must be last for cache stability
+    # Bake the project's Python packages into the image
+    # This copies api/, demand/, simulation/, scripts/ as importable modules
+    .add_local_python_source(
+        "api", "demand", "simulation", "scripts",
+        copy=True,
+    )
 )
-
-app = modal.App("optistock-api")
 
 
 def warmup_numba():
