@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In — OptiStock</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="auth-page">
+    <div class="auth-container">
+        <a href="/" class="logo-link">📦 OptiStock</a>
+        <h2>Welcome back</h2>
+        <p class="auth-sub">Sign in to your account</p>
+
+        <form id="login-form" class="auth-form" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" required placeholder="john@company.com" autocomplete="email">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" required placeholder="Enter your password" autocomplete="current-password">
+            </div>
+            <div class="form-group" style="display:flex;justify-content:space-between;align-items:center;">
+                <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;cursor:pointer;">
+                    <input type="checkbox" id="remember" style="width:auto;"> Remember me
+                </label>
+                <a href="#" onclick="alert('Password reset — contact support for now')" style="font-size:.85rem;color:var(--primary);text-decoration:none;">Forgot password?</a>
+            </div>
+            <div id="login-error" class="error-msg" style="display:none;"></div>
+            <button type="submit" class="btn btn-primary btn-full" id="login-btn">Sign In</button>
+        </form>
+
+        <p class="auth-footer">
+            Don't have an account? <a href="/static/signup.html">Sign up</a>
+        </p>
+    </div>
+
+    <script>
+    async function handleLogin(e) {
+        e.preventDefault();
+        const btn = document.getElementById('login-btn');
+        const error = document.getElementById('login-error');
+        btn.disabled = true;
+        btn.textContent = 'Signing in...';
+        error.style.display = 'none';
+
+        try {
+            const res = await fetch('/v1/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: document.getElementById('email').value,
+                    password: document.getElementById('password').value
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail?.error || data.detail || 'Login failed');
+
+            localStorage.setItem('token', data.access_token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            window.location.href = '/static/dashboard.html';
+        } catch (err) {
+            error.textContent = err.message;
+            error.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Sign In';
+        }
+    }
+    </script>
+</body>
+</html>

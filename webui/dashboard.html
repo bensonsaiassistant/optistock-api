@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — OptiStock</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/dashboard.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="dashboard-page">
+    <div class="dashboard-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <a href="/" class="sidebar-logo">📦 OptiStock</a>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-tab="overview" onclick="switchTab('overview', this)">📊 Overview</a>
+                <a href="#" class="nav-item" data-tab="keys" onclick="switchTab('keys', this)">🔑 API Keys</a>
+                <a href="#" class="nav-item" data-tab="usage" onclick="switchTab('usage', this)">📈 Usage</a>
+                <a href="#" class="nav-item" data-tab="billing" onclick="switchTab('billing', this)">💳 Billing</a>
+                <a href="#" class="nav-item" data-tab="settings" onclick="switchTab('settings', this)">⚙️ Settings</a>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="/" class="nav-item">🏠 Home</a>
+                <a href="#" class="nav-item" onclick="handleLogout()">🚪 Logout</a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="dashboard-main">
+            <header class="dashboard-header">
+                <h1 id="page-title">Overview</h1>
+                <div class="user-info">
+                    <span id="user-greeting">Welcome</span>
+                </div>
+            </header>
+
+            <!-- Overview Tab -->
+            <div id="tab-overview" class="tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Current Plan</h3>
+                        <p class="stat-value" id="overview-plan">Free</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>API Calls This Month</h3>
+                        <p class="stat-value" id="overview-usage">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>API Keys</h3>
+                        <p class="stat-value" id="overview-keys">0</p>
+                    </div>
+                </div>
+                <div class="action-cards">
+                    <a href="#" class="action-card" onclick="switchTab('keys', document.querySelector('[data-tab=keys]'))">
+                        <h3>🔑 Manage API Keys</h3>
+                        <p>Create or revoke your API keys</p>
+                    </a>
+                    <a href="/static/checkout.html" class="action-card">
+                        <h3>📦 Upgrade Plan</h3>
+                        <p>Get higher usage limits and premium features</p>
+                    </a>
+                </div>
+            </div>
+
+            <!-- API Keys Tab -->
+            <div id="tab-keys" class="tab-content">
+                <div class="tab-header">
+                    <h2>API Keys</h2>
+                    <button class="btn btn-primary" onclick="showCreateKeyModal()">+ Create New Key</button>
+                </div>
+                <div id="keys-list" class="keys-list">
+                    <p class="empty-state">No API keys yet. Create one to get started.</p>
+                </div>
+                <!-- New Key Modal -->
+                <div id="new-key-modal" class="modal" style="display:none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Create New API Key</h3>
+                            <button class="modal-close" onclick="hideCreateKeyModal()">&times;</button>
+                        </div>
+                        <form onsubmit="handleCreateKey(event)">
+                            <div class="form-group">
+                                <label for="key-name">Key Name</label>
+                                <input type="text" id="key-name" placeholder="e.g., Production API Key" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Generate Key</button>
+                        </form>
+                    </div>
+                </div>
+                <!-- Show New Key Modal -->
+                <div id="show-key-modal" class="modal" style="display:none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>🔑 Your New API Key</h3>
+                            <button class="modal-close" onclick="hideShowKeyModal()">&times;</button>
+                        </div>
+                        <div class="key-display">
+                            <p><strong>This key will only be shown once. Save it now!</strong></p>
+                            <code id="new-key-value"></code>
+                            <button class="btn btn-secondary" onclick="copyNewKey()">📋 Copy</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Usage Tab -->
+            <div id="tab-usage" class="tab-content">
+                <div class="usage-card">
+                    <h2>API Usage This Month</h2>
+                    <div class="usage-bar">
+                        <div class="usage-fill" id="usage-fill" style="width: 0%"></div>
+                    </div>
+                    <p class="usage-text"><span id="usage-current">0</span> / <span id="usage-limit">100</span> calls (<span id="usage-pct">0</span>%)</p>
+                </div>
+                <div class="usage-history">
+                    <h3>Usage History</h3>
+                    <canvas id="usage-chart" width="600" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Billing Tab -->
+            <div id="tab-billing" class="tab-content">
+                <div class="billing-plan-card">
+                    <h2>Current Plan</h2>
+                    <p class="plan-name" id="billing-plan">Free Tier</p>
+                    <p class="plan-price" id="billing-price">$0/mo</p>
+                    <div class="billing-actions">
+                        <a href="/static/checkout.html" class="btn btn-primary">Upgrade Plan</a>
+                        <button class="btn btn-secondary" id="manage-billing-btn" onclick="openBillingPortal()" style="display:none;">Manage Billing</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="tab-settings" class="tab-content">
+                <div class="settings-card">
+                    <h2>Profile Settings</h2>
+                    <form onsubmit="handleUpdateProfile(event)">
+                        <div class="form-group">
+                            <label for="settings-name">Name</label>
+                            <input type="text" id="settings-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="settings-email">Email</label>
+                            <input type="email" id="settings-email" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </form>
+                </div>
+                <div class="settings-card">
+                    <h2>Change Password</h2>
+                    <form onsubmit="handleChangePassword(event)">
+                        <div class="form-group">
+                            <label for="current-password">Current Password</label>
+                            <input type="password" id="current-password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="new-password">New Password</label>
+                            <input type="password" id="new-password" required minlength="8">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Update Password</button>
+                    </form>
+                </div>
+                <div class="settings-card danger-zone">
+                    <h2>⚠️ Danger Zone</h2>
+                    <button class="btn btn-danger" onclick="handleDeleteAccount()">Delete Account</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/dashboard.js"></script>
+</body>
+</html>

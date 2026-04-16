@@ -36,6 +36,7 @@ image = (
         "xgboost>=2.0.0",
         "scikit-learn>=1.3.0",
         "polars>=0.20.0",
+        "stripe>=5.0.0",
         "modal>=0.60.0",
         "bcrypt>=4.0.0",
         "pyjwt>=2.0.0",
@@ -82,10 +83,12 @@ fastapi_app = FastAPI(
 # Mount API routes
 from api.routes import router, register_security_handlers
 from api.user_routes import router as user_router
+from api.billing_routes import router as billing_router
 
 register_security_handlers(fastapi_app)
 fastapi_app.include_router(router)
 fastapi_app.include_router(user_router)
+fastapi_app.include_router(billing_router)
 
 @app.function(
     image=image,

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing — OptiStock</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="/" class="logo">📦 OptiStock</a>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/static/login.html">Sign In</a>
+                <a href="/static/signup.html" class="nav-cta">Sign Up</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="checkout-page">
+        <div style="text-align:center;margin-bottom:48px;">
+            <h2>Choose Your Plan</h2>
+            <p style="color:var(--text-muted);font-size:1.1rem;max-width:600px;margin:8px auto 0;">Start with a free account, upgrade when you need more power.</p>
+        </div>
+
+        <div class="pricing-grid">
+            <div class="price-card">
+                <h3>Starter</h3>
+                <div class="price">$49<span>/mo</span></div>
+                <ul>
+                    <li>1,000 API calls per month</li>
+                    <li>Basic demand forecasting</li>
+                    <li>Rolling average calculations</li>
+                    <li>Email support</li>
+                    <li>Single API key</li>
+                </ul>
+                <button class="btn btn-secondary btn-full" onclick="handleCheckout('starter')">Get Started</button>
+            </div>
+            <div class="price-card featured">
+                <div class="badge">Most Popular</div>
+                <h3>Professional</h3>
+                <div class="price">$149<span>/mo</span></div>
+                <ul>
+                    <li>10,000 API calls per month</li>
+                    <li>ML demand prediction (XGBoost)</li>
+                    <li>Deviation guardrails</li>
+                    <li>Priority support</li>
+                    <li>Up to 5 API keys</li>
+                    <li>Batch optimization</li>
+                </ul>
+                <button class="btn btn-primary btn-full" onclick="handleCheckout('professional')">Get Started</button>
+            </div>
+            <div class="price-card">
+                <h3>Enterprise</h3>
+                <div class="price">$399<span>/mo</span></div>
+                <ul>
+                    <li>Unlimited API calls</li>
+                    <li>ML demand + lead time prediction</li>
+                    <li>Uncertainty quantification</li>
+                    <li>Dedicated account manager</li>
+                    <li>Unlimited API keys</li>
+                    <li>Custom integrations</li>
+                    <li>SLA guarantee</li>
+                </ul>
+                <button class="btn btn-secondary btn-full" onclick="handleCheckout('enterprise')">Contact Sales</button>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div style="max-width:1200px;margin:0 auto;">
+            <p>&copy; 2026 OptiStock. All rights reserved. | <a href="/static/tos.html">Terms</a> | <a href="/static/privacy.html">Privacy</a></p>
+        </div>
+    </footer>
+
+    <script>
+    async function handleCheckout(tier) {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            // Redirect to login with return URL
+            window.location.href = '/static/login.html?return=/static/checkout.html&tier=' + tier;
+            return;
+        }
+
+        try {
+            const res = await fetch('/v1/billing/checkout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify({ price_tier: tier })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail?.error || data.error || 'Checkout failed');
+            if (data.checkout_url) {
+                window.location.href = data.checkout_url;
+            } else {
+                alert('Could not create checkout session. Please try again.');
+            }
+        } catch (e) {
+            alert('Error: ' + e.message);
+        }
+    }
+    </script>
+</body>
+</html>
