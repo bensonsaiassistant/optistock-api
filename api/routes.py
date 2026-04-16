@@ -40,10 +40,10 @@ def calculate_demand_from_history(
 
     hist_dict = [
         {
-            "date": h.date,
-            "quantity": h.quantity,
-            "available": h.available,
-            "mercury_order_quantity": h.mercury_order_quantity,
+            "date": h.date if hasattr(h, 'date') else h['date'],
+            "quantity": h.quantity if hasattr(h, 'quantity') else h['quantity'],
+            "available": h.available if hasattr(h, 'available') else h.get('available', 1.0),
+            "mercury_order_quantity": h.mercury_order_quantity if hasattr(h, 'mercury_order_quantity') else h.get('mercury_order_quantity', 0.0),
         }
         for h in historical_data
     ]
@@ -142,6 +142,7 @@ def run_batch_psl_optimization(
     n = len(items)
     ads_arr = np.zeros(n)
     var_arr = np.zeros(n)
+    demand_sources = []
     lt_arr = np.zeros(n)
     gm_arr = np.zeros(n)
     cost_arr = np.zeros(n)
@@ -155,11 +156,12 @@ def run_batch_psl_optimization(
 
     # Pre-compute demand for each item
     for i, item in enumerate(items):
-        ads, var, _ = calculate_demand_from_history(
+        ads, var, source = calculate_demand_from_history(
             item.historical_data, item.item_id, tier,
         )
         ads_arr[i] = ads
         var_arr[i] = var
+        demand_sources.append(source)
         lt_arr[i] = item.lead_time_days
         gm_arr[i] = item.sale_price - item.cost
         cost_arr[i] = item.cost
@@ -203,7 +205,7 @@ def run_batch_psl_optimization(
             expected_avg_inventory=inventory,
             cube_usage=cube,
             profit_per_cube=ppc,
-            demand_source="adjusted_demand",
+            demand_source=demand_sources[i],
             ads=ads_arr[i],
             variance=var_arr[i],
             warnings=[],
