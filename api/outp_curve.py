@@ -15,13 +15,13 @@ def get_outp_curve(
 ) -> list[dict]:
     """Return profit curve across all OUTP values."""
     import numpy as np
-    
+
     # Generate OUTP values to sweep (same logic as calc_opti_outp)
     lt_int = int(round(lt))
     outps_to_calc = int(max(1, ads) * max(1, lt) * 3)
     outps_to_calc = max(outps_to_calc, 1)
     outp_values = np.arange(1, outps_to_calc + 1, dtype=np.float64)
-    
+
     # Generate demand samples (deterministic)
     rng = np.random.RandomState(seed)
     use_pre_sampled = (ads / var < 0.95) and (var - ads > 0.1)
@@ -33,12 +33,12 @@ def get_outp_curve(
         demand_sample = demand_sample.astype(np.int64)
     else:
         demand_sample = rng.poisson(ads, days).astype(np.int64)
-    
+
     # Generate lead time samples
     np.random.seed(99)
     from simulation.outp_optimizer import _generate_lead_time_sample
     lt_sample = _generate_lead_time_sample(lt, lt_variance, days)
-    
+
     # Run sweep
     results = _calc_opti_outp_inner(
         outp_values, ads, var, int64(lt_int), gm, cost,
@@ -46,9 +46,14 @@ def get_outp_curve(
         int64(p_terms), int64(s_terms), int64(days),
         demand_sample, lt_sample, cost_of_capital,
     )
-    
+
     # Skip first row if it's OUTP=0
     if results.shape[0] > 1:
         results = results[1:]
-    
-    return [{"outp": int(r[0]), "profit": float(r[1])} for r in results]
+
+    # Downsample to ~50 points for efficient API response
+    n = len(results)
+    step = max(1, n // 50)
+    sampled = results[::step]
+
+    return [{"outp": int(r[0]), "profit": float(r[1])} for r in sampled]
