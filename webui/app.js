@@ -94,6 +94,7 @@
         const orderFreq = parseInt(document.getElementById('demo-order-freq').value) || 7;
         const tier = document.getElementById('demo-tier').value || 'basic';
         const historicalRaw = document.getElementById('demo-historical').value;
+        const apiKey = document.getElementById('demo-api-key')?.value?.trim() || '';
 
         // Parse historical data
         let historicalData;
@@ -149,7 +150,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-API-Key': 'dev-key'
+                    ...(apiKey && { 'X-API-Key': apiKey })
                 },
                 body: JSON.stringify(requestBody)
             });
