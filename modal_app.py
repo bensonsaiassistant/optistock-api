@@ -38,6 +38,7 @@ image = (
         "polars>=0.20.0",
         "stripe>=5.0.0",
         "modal>=0.60.0",
+        # webui v2 - 2026-04-16
         "bcrypt>=4.0.0",
         "pyjwt>=2.0.0",
         "email-validator>=2.0.0",
@@ -49,6 +50,7 @@ image = (
     .add_local_dir(
         WEBUI_DIR,
         remote_path="/root/webui",
+        ignore=lambda x: False,  # force rebuild
     )
 )
 
