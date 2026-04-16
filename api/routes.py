@@ -222,7 +222,7 @@ def run_single_item(item: "ItemInput", tier: str, cost_of_capital: float) -> Ite
                 ads=ads, variance=var, warnings=warnings,
             )
 
-    gm = item.sale_price - item.cost
+    gm = item.net_profit_per_unit if item.net_profit_per_unit is not None else (item.sale_price - item.cost)
     if gm <= 0:
         warnings.append("Negative or zero gross margin")
         return ItemResult(
@@ -481,7 +481,7 @@ async def simulate(
 ):
     """Run simulation directly with provided ads/var (no demand forecasting)."""
     check_body_size(request)
-    gm = body.sale_price - body.cost
+    gm = body.net_profit_per_unit if body.net_profit_per_unit is not None else (body.sale_price - body.cost)
     optimal_outp, profit, inventory, sales, cube, ppc = run_outp_optimization(
         ads=body.ads, var=body.variance, lt=body.lead_time_days, gm=gm,
         cost=body.cost, sale_price=body.sale_price,

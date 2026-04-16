@@ -99,6 +99,8 @@
         const height = parseFloat(document.getElementById('demo-height').value) || 1.0;
         const paymentTerms = parseInt(document.getElementById('demo-payment-terms').value) || 30;
         const salesTerms = parseInt(document.getElementById('demo-sales-terms').value) || 30;
+        const netProfitRaw = document.getElementById('demo-net-profit')?.value?.trim();
+        const netProfit = netProfitRaw ? parseFloat(netProfitRaw) : null;
         const tier = document.getElementById('demo-tier').value || 'basic';
         const historicalRaw = document.getElementById('demo-historical').value;
 
@@ -140,7 +142,8 @@
                 length: length,
                 width: width,
                 height: height,
-                historical_data: historicalData
+                historical_data: historicalData,
+                ...(netProfit !== null && { net_profit_per_unit: netProfit })
             }],
             tier: tier,
             cost_of_capital: coc / 100  // convert percentage to decimal
