@@ -351,21 +351,22 @@ def run_batch_outp_optimization(
 # ── Route handlers ─────────────────────────────────────────────────────────
 @router.post("/v1/optimize")
 async def optimize(
-    request: OptimizeRequest,
+    request: Request,
+    body: OptimizeRequest,
     api_key: str = Depends(validate_api_key),
 ):
     check_body_size(request)
     request_id = str(uuid.uuid4())
     start_time = time.time()
 
-    if len(request.items) >= BATCH_THRESHOLD:
+    if len(body.items) >= BATCH_THRESHOLD:
         results = run_batch_outp_optimization(
-            request.items, request.tier, request.cost_of_capital,
+            body.items, body.tier, body.cost_of_capital,
         )
     else:
         results = [
-            run_single_item(item, request.tier, request.cost_of_capital)
-            for item in request.items
+            run_single_item(item, body.tier, body.cost_of_capital)
+            for item in body.items
         ]
 
     compute_time_ms = (time.time() - start_time) * 1000
@@ -375,7 +376,7 @@ async def optimize(
         request_id=request_id,
         api_key=api_key,
         endpoint="/v1/optimize",
-        request_data=request.model_dump(),
+        request_data=body.model_dump(),
         response_data=response.model_dump(),
         compute_time_ms=compute_time_ms,
     )
@@ -386,14 +387,15 @@ async def optimize(
 
 @router.post("/v1/demand")
 async def demand_forecast(
-    request: DemandRequest,
+    request: Request,
+    body: DemandRequest,
     api_key: str = Depends(validate_api_key),
 ):
     check_body_size(request)
     start_time = time.time()
     results = []
 
-    for item in request.items:
+    for item in body.items:
         ads, var, source = calculate_demand_from_history(
             item.historical_data, item.item_id, "basic",
         )
@@ -408,7 +410,7 @@ async def demand_forecast(
         request_id=str(uuid.uuid4()),
         api_key=api_key,
         endpoint="/v1/demand",
-        request_data=request.model_dump(),
+        request_data=body.model_dump(),
         response_data=response.model_dump(),
         compute_time_ms=compute_time_ms,
     )
@@ -473,27 +475,28 @@ async def get_single_request(
 
 @router.post("/v1/simulate")
 async def simulate(
-    request: SimulateRequest,
+    request: Request,
+    body: SimulateRequest,
     api_key: str = Depends(validate_api_key),
 ):
     """Run simulation directly with provided ads/var (no demand forecasting)."""
     check_body_size(request)
-    gm = request.sale_price - request.cost
+    gm = body.sale_price - body.cost
     optimal_outp, profit, inventory, sales, cube, ppc = run_outp_optimization(
-        ads=request.ads, var=request.variance, lt=request.lead_time_days, gm=gm,
-        cost=request.cost, sale_price=request.sale_price,
-        length=request.length, width=request.width, height=request.height,
-        p_terms=request.payment_terms_days, s_terms=request.sales_terms_days,
-        cost_of_capital=request.cost_of_capital,
+        ads=body.ads, var=body.variance, lt=body.lead_time_days, gm=gm,
+        cost=body.cost, sale_price=body.sale_price,
+        length=body.length, width=body.width, height=body.height,
+        p_terms=body.payment_terms_days, s_terms=body.sales_terms_days,
+        cost_of_capital=body.cost_of_capital,
     )
 
     recommended_qty = max(
         0,
-        optimal_outp - request.current_available - request.on_order_qty + request.back_order_qty,
+        optimal_outp - body.current_available - body.on_order_qty + body.back_order_qty,
     )
 
     return ItemResult(
-        item_id=request.item_id,
+        item_id=body.item_id,
         optimal_outp=optimal_outp,
         recommended_order_qty=recommended_qty,
         expected_profit=profit,
@@ -502,8 +505,8 @@ async def simulate(
         cube_usage=cube,
         profit_per_cube=ppc,
         demand_source="direct_input",
-        ads=request.ads,
-        variance=request.variance,
+        ads=body.ads,
+        variance=body.variance,
         warnings=[],
     )
 
