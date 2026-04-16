@@ -2,7 +2,7 @@
 
 Cost-optimized configuration:
 - Scales to zero when idle (no fixed cost)
-- Tight timeout (30s — requests never need more)
+- Tight timeout (60s — accounts for Numba JIT cold start on first request)
 - Small CPU/memory (basic tier is ~125ms, premium/elite ~4s)
 - Concurrency limits to prevent runaway scaling
 - Source code baked into the image (no mount issues)
@@ -96,7 +96,7 @@ fastapi_app.include_router(billing_router)
     secrets=[modal.Secret.from_name("optistock-api-keys")],
     cpu=1.0,
     memory=1024,
-    timeout=30,
+    timeout=60,
     min_containers=0,
     max_containers=4,
     env={"OPTISTOCK_DB_PATH": "/root/data/optistock.db"},
