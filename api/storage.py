@@ -165,8 +165,11 @@ async def store_request(
     """
     try:
         conn = await init_db()
+    except (ValueError, OSError, aiosqlite.Error) as e:
+        logger.error("Failed to connect to storage DB: %s", e)
+        return
     except Exception as e:
-        logger.error(f"Failed to connect to storage DB: {e}")
+        logger.exception("Unexpected error connecting to storage DB: %s", e)
         return
 
     try:
@@ -294,11 +297,19 @@ async def store_request(
 
         await conn.commit()
 
-    except Exception as e:
-        logger.error(f"Failed to store request {request_id}: {e}")
+    except (ValueError, TypeError, OSError) as e:
+        # Expected errors: validation failures, I/O issues
+        logger.error("Failed to store request %s: %s", request_id, e)
         try:
             await conn.rollback()
-        except Exception:
+        except (aiosqlite.Error, ValueError, OSError):
+            pass
+    except Exception as e:
+        # Unexpected errors: still log and continue serving
+        logger.exception("Unexpected error storing request %s", request_id)
+        try:
+            await conn.rollback()
+        except (aiosqlite.Error, ValueError, OSError):
             pass
 
 
@@ -318,8 +329,11 @@ async def get_requests(
     """
     try:
         conn = await init_db()
+    except (ValueError, OSError, aiosqlite.Error) as e:
+        logger.error("Failed to connect to storage DB for query: %s", e)
+        return []
     except Exception as e:
-        logger.error(f"Failed to connect to storage DB for query: {e}")
+        logger.exception("Unexpected error connecting to storage DB for query: %s", e)
         return []
 
     try:
@@ -400,8 +414,13 @@ async def get_requests(
 
         return list(requests_map.values())
 
+    except (ValueError, TypeError, OSError, aiosqlite.Error) as e:
+        # Expected errors: validation, I/O, database
+        logger.error("Failed to query requests: %s", e)
+        return []
     except Exception as e:
-        logger.error(f"Failed to query requests: {e}")
+        # Unexpected errors: still log and continue serving
+        logger.exception("Unexpected error querying requests: %s", e)
         return []
 
 
@@ -412,8 +431,11 @@ async def get_request(request_id: str) -> Optional[dict]:
     """
     try:
         conn = await init_db()
+    except (ValueError, OSError, aiosqlite.Error) as e:
+        logger.error("Failed to connect to storage DB for get_request: %s", e)
+        return None
     except Exception as e:
-        logger.error(f"Failed to connect to storage DB for get_request: {e}")
+        logger.exception("Unexpected error connecting to storage DB for get_request: %s", e)
         return None
 
     try:
@@ -449,8 +471,13 @@ async def get_request(request_id: str) -> Optional[dict]:
         result["items"] = items
         return result
 
+    except (ValueError, TypeError, OSError, aiosqlite.Error) as e:
+        # Expected errors: validation, I/O, database
+        logger.error("Failed to get request %s: %s", request_id, e)
+        return None
     except Exception as e:
-        logger.error(f"Failed to get request {request_id}: {e}")
+        # Unexpected errors: still log and continue serving
+        logger.exception("Unexpected error getting request %s", request_id)
         return None
 
 

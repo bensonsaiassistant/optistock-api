@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OptiStock — AI-Powered Inventory Optimization</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="#" class="logo">📦 OptiStock</a>
+            <div class="nav-links">
+                <a href="#how-it-works">How It Works</a>
+                <a href="#demo">Try It</a>
+                <a href="#pricing">Pricing</a>
+                <a href="#api-docs">API</a>
+                <a href="#demo" class="nav-cta">Get Started</a>
+            </div>
+            <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')">☰</button>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <header class="hero">
+        <div class="hero-inner">
+            <h1>Stop Guessing.<br>Start Optimizing.</h1>
+            <p>AI-powered inventory optimization for Amazon FBA sellers. Tell us what you sell, and we'll tell you exactly how much to order — maximizing profit, minimizing waste.</p>
+            <div class="hero-cta">
+                <a href="#demo" class="btn btn-primary">Try It Free</a>
+                <a href="#pricing" class="btn btn-secondary">View Plans</a>
+            </div>
+            <div class="hero-stats">
+                <div class="stat">
+                    <div class="stat-num" data-target="15">0%</div>
+                    <div class="stat-label">Average Profit Increase</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-num" data-target="23">0%</div>
+                    <div class="stat-label">Less Overstock</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-num" data-target="100">0K+</div>
+                    <div class="stat-label">Simulations Per Run</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- How It Works -->
+    <section id="how-it-works" class="section section-alt">
+        <div class="section-inner">
+            <h2>How It Works</h2>
+            <p class="section-sub">Three steps to optimal inventory</p>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <h3>Enter Your Data</h3>
+                    <p>Upload your sales history, costs, lead times, and current stock levels. We accept CSV, JSON, or manual entry.</p>
+                </div>
+                <div class="step">
+                    <div class="step-num">2</div>
+                    <h3>AI Analyzes Demand</h3>
+                    <p>Our ML models learn seasonal patterns, day-of-week effects, and trends. Premium & Elite tiers use XGBoost regression for maximum accuracy.</p>
+                </div>
+                <div class="step">
+                    <div class="step-num">3</div>
+                    <h3>Get Optimal Orders</h3>
+                    <p>Monte Carlo simulation runs 100,000+ scenarios to find the order quantity that maximizes your profit. You get a clear "buy X units" recommendation.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Interactive Demo -->
+    <section id="demo" class="section">
+        <div class="section-inner">
+            <h2>Try It Now</h2>
+            <p class="section-sub">See OptiStock in action with sample data — no sign-up required</p>
+            <div class="demo-grid">
+                <div class="demo-form">
+                    <div class="form-row">
+                        <label>Item ID</label>
+                        <input type="text" id="demo-item-id" value="SKU-001">
+                    </div>
+                    <div class="form-row-2">
+                        <div class="form-row">
+                            <label>Unit Cost ($)</label>
+                            <input type="number" id="demo-cost" value="12.50" step="0.01" min="0">
+                        </div>
+                        <div class="form-row">
+                            <label>Sale Price ($)</label>
+                            <input type="number" id="demo-price" value="29.99" step="0.01" min="0">
+                        </div>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="form-row">
+                            <label>Current Stock</label>
+                            <input type="number" id="demo-stock" value="150" min="0">
+                        </div>
+                        <div class="form-row">
+                            <label>On Order</label>
+                            <input type="number" id="demo-on-order" value="0" min="0">
+                        </div>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="form-row">
+                            <label>Lead Time (days)</label>
+                            <input type="number" id="demo-lead-time" value="14" min="0">
+                        </div>
+                        <div class="form-row">
+                            <label>Order Frequency (days)</label>
+                            <input type="number" id="demo-order-freq" value="7" min="1">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <label>Historical Daily Sales (comma-separated numbers)</label>
+                        <textarea id="demo-historical" rows="6">5, 7, 3, 8, 6, 4, 9, 7, 5, 6, 8, 3, 7, 5, 4, 6, 8, 7, 5, 9, 6, 4, 7, 5, 8, 6, 3, 7, 5, 4, 6, 8, 7, 5, 9, 6, 4, 7, 5, 8</textarea>
+                    </div>
+                    <div class="form-row">
+                        <label>Tier</label>
+                        <select id="demo-tier">
+                            <option value="basic" selected>Basic (Rolling Averages)</option>
+                            <option value="premium">Premium (ML + XGBoost)</option>
+                            <option value="elite">Elite (ML Demand + ML Lead Time)</option>
+                        </select>
+                    </div>
+                    <button id="demo-btn" class="btn btn-primary btn-full" onclick="runDemo()">Optimize Now</button>
+                </div>
+
+                <div class="demo-results" id="demo-results">
+                    <div class="results-placeholder">
+                        <p>Click "Optimize Now" to see results</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing -->
+    <section id="pricing" class="section section-alt">
+        <div class="section-inner">
+            <h2>Simple, Transparent Pricing</h2>
+            <p class="section-sub">Start free, scale when you're ready</p>
+            <div class="pricing-grid">
+                <div class="price-card">
+                    <h3>Starter</h3>
+                    <div class="price">$49<span>/mo</span></div>
+                    <ul>
+                        <li>Basic demand forecasting</li>
+                        <li>Rolling average calculations</li>
+                        <li>Up to 100 items/month</li>
+                        <li>Email support</li>
+                        <li>API access</li>
+                    </ul>
+                    <a href="#demo" class="btn btn-secondary">Get Started</a>
+                </div>
+                <div class="price-card featured">
+                    <div class="badge">Most Popular</div>
+                    <h3>Professional</h3>
+                    <div class="price">$149<span>/mo</span></div>
+                    <ul>
+                        <li>ML demand prediction (XGBoost)</li>
+                        <li>Deviation guardrails</li>
+                        <li>Up to 1,000 items/month</li>
+                        <li>Priority support</li>
+                        <li>Batch optimization</li>
+                        <li>Historical analytics</li>
+                    </ul>
+                    <a href="#demo" class="btn btn-primary">Get Started</a>
+                </div>
+                <div class="price-card">
+                    <h3>Enterprise</h3>
+                    <div class="price">$399<span>/mo</span></div>
+                    <ul>
+                        <li>ML demand + lead time prediction</li>
+                        <li>Uncertainty quantification</li>
+                        <li>Unlimited items</li>
+                        <li>Dedicated account manager</li>
+                        <li>Custom integrations</li>
+                        <li>SLA guarantee</li>
+                        <li>Advanced reporting</li>
+                    </ul>
+                    <a href="#demo" class="btn btn-secondary">Contact Sales</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- API Docs -->
+    <section id="api-docs" class="section">
+        <div class="section-inner">
+            <h2>Developer API</h2>
+            <p class="section-sub">Integrate OptiStock into your existing workflows</p>
+            <div class="api-doc">
+                <div class="api-endpoint">
+                    <span class="method post">POST</span>
+                    <code>/v1/optimize</code>
+                    <span class="api-desc">Full optimization pipeline — demand forecast, simulation, order recommendation</span>
+                </div>
+                <div class="api-code-block">
+                    <div class="code-header">
+                        <span>Example Request</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    </div>
+                    <pre><code>curl -X POST https://api.optistock.com/v1/optimize \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{
+    "items": [{
+      "item_id": "SKU-001",
+      "cost": 12.50,
+      "sale_price": 29.99,
+      "current_available": 150,
+      "on_order_qty": 0,
+      "lead_time_days": 14,
+      "historical_data": [
+        {"date": "2025-01-01", "quantity": 5, "available": 200},
+        {"date": "2025-01-02", "quantity": 7, "available": 195}
+      ]
+    }],
+    "tier": "premium",
+    "cost_of_capital": 0.14
+  }'</code></pre>
+                </div>
+                <div class="api-code-block">
+                    <div class="code-header">
+                        <span>Example Response</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    </div>
+                    <pre><code>{
+  "items": [{
+    "item_id": "SKU-001",
+    "optimal_outp": 175,
+    "recommended_order_qty": 25,
+    "expected_profit": 1247.50,
+    "expected_daily_sales": 6.2,
+    "expected_avg_inventory": 88.5,
+    "demand_source": "ml_regression",
+    "warnings": []
+  }],
+  "compute_time_ms": 1350
+}</code></pre>
+                </div>
+            </div>
+            <div class="api-endpoints-grid">
+                <div class="endpoint-card">
+                    <span class="method post">POST</span>
+                    <code>/v1/demand</code>
+                    <p>Demand forecast only. Returns predicted ADS and variance without running the full simulation.</p>
+                </div>
+                <div class="endpoint-card">
+                    <span class="method post">POST</span>
+                    <code>/v1/simulate</code>
+                    <p>Direct simulation. Provide your own ADS and variance, skip demand forecasting entirely.</p>
+                </div>
+                <div class="endpoint-card">
+                    <span class="method get">GET</span>
+                    <code>/health</code>
+                    <p>Liveness check. Returns service status for monitoring and health checks.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer CTA -->
+    <section class="cta-section">
+        <div class="section-inner">
+            <h2>Ready to Optimize Your Inventory?</h2>
+            <p>Start with a free demo, then scale with our API. No credit card required.</p>
+            <a href="#demo" class="btn btn-primary btn-lg">Try the Demo</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="section-inner">
+            <p>&copy; 2026 OptiStock. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

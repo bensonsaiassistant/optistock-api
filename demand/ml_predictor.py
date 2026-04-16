@@ -257,10 +257,25 @@ def predict_demand_ml(
         )
         return ml_ads, ml_var, "ml_regression"
 
-    except Exception as e:
+    except ImportError as e:
+        # ml-regression package not available
         logger.warning(
-            f"ML regression failed for item {item_id}: {e}. "
-            f"Falling back to adjusted_demand."
+            "ML regression package not available for item %s: %s. "
+            "Falling back to adjusted_demand.", item_id, e
+        )
+        return baseline_ads, baseline_var, "adjusted_demand"
+    except (ValueError, KeyError, IndexError) as e:
+        # Expected data/model errors
+        logger.warning(
+            "ML regression data error for item %s: %s. "
+            "Falling back to adjusted_demand.", item_id, e
+        )
+        return baseline_ads, baseline_var, "adjusted_demand"
+    except Exception as e:
+        # Unexpected errors: log and fallback gracefully
+        logger.exception(
+            "ML regression failed unexpectedly for item %s: %s. "
+            "Falling back to adjusted_demand.", item_id, e
         )
         return baseline_ads, baseline_var, "adjusted_demand"
 

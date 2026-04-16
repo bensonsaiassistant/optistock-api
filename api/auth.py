@@ -55,6 +55,32 @@ def _check_rate_limit(key_hash: str) -> None:
     timestamps.append(now)
 
 
+def _prune_rate_log() -> None:
+    """Remove expired entries from the rate limiter to prevent memory leaks.
+
+    The rate log grows unbounded as new API keys make requests. This function
+    cleans up entries that have no recent activity. Called every 100 requests
+    to avoid per-request overhead.
+    """
+    now = time.monotonic()
+    cutoff = now - _RATE_WINDOW_SECONDS * 2  # keep 2x the window for safety
+    # Get list of keys to avoid modifying dict during iteration
+    keys_to_check = list(_request_log.keys())
+    for key in keys_to_check:
+        timestamps = _request_log[key]
+        # Remove timestamps outside the extended window
+        while timestamps and timestamps[0] < cutoff:
+            timestamps.pop(0)
+        # Remove empty entries entirely
+        if not timestamps:
+            del _request_log[key]
+
+
+# Counter for periodic pruning (reset after each full prune)
+_rate_prune_counter: int = 0
+_RATE_PRUNE_INTERVAL = 100
+
+
 # ── Key validation ─────────────────────────────────────────────────────────
 def validate_api_key_format(api_key: str | None) -> str:
     """Validate that an API key looks reasonable before hashing/comparing.
@@ -88,6 +114,8 @@ async def validate_api_key(request: Request) -> str:
     In dev mode (no keys configured), passes through after rate-limit check.
     Returns the **raw** API key from the header (never stored).
     """
+    global _rate_prune_counter
+
     raw_key = request.headers.get("X-API-Key")
 
     if not _VALID_KEY_HASHES:
@@ -96,6 +124,11 @@ async def validate_api_key(request: Request) -> str:
             validate_api_key_format(raw_key)
             key_hash = _hash_key(raw_key)
             _check_rate_limit(key_hash)
+        # Periodic prune to prevent memory leak in the rate log
+        _rate_prune_counter += 1
+        if _rate_prune_counter >= _RATE_PRUNE_INTERVAL:
+            _prune_rate_log()
+            _rate_prune_counter = 0
         return raw_key or "dev-unauthenticated"
 
     key = validate_api_key_format(raw_key)
@@ -115,4 +148,11 @@ async def validate_api_key(request: Request) -> str:
         )
 
     _check_rate_limit(key_hash)
+
+    # Periodic prune to prevent memory leak in the rate log
+    _rate_prune_counter += 1
+    if _rate_prune_counter >= _RATE_PRUNE_INTERVAL:
+        _prune_rate_log()
+        _rate_prune_counter = 0
+
     return key

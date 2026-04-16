@@ -209,10 +209,26 @@ def predict_lead_time_ml(
         )
         return ml_lt, ml_var, "ml_regression"
 
-    except Exception as e:
+    except ImportError as e:
         logger.warning(
-            f"ML regression failed for lead time item {item_id}: {e}. "
-            f"Falling back to historical_mean."
+            "ML regression package not available for lead time item %s: %s. "
+            "Falling back to historical_mean.", item_id, e
+        )
+        historical_var = float(np.var(historical_lead_times)) if len(historical_lead_times) > 1 else historical_mean
+        historical_var = max(historical_var, historical_mean)
+        return historical_mean, historical_var, "historical_mean"
+    except (ValueError, KeyError, IndexError, RuntimeError) as e:
+        logger.warning(
+            "ML regression data error for lead time item %s: %s. "
+            "Falling back to historical_mean.", item_id, e
+        )
+        historical_var = float(np.var(historical_lead_times)) if len(historical_lead_times) > 1 else historical_mean
+        historical_var = max(historical_var, historical_mean)
+        return historical_mean, historical_var, "historical_mean"
+    except Exception as e:
+        logger.exception(
+            "Unexpected error in ML regression for lead time item %s: %s. "
+            "Falling back to historical_mean.", item_id, e
         )
         historical_var = float(np.var(historical_lead_times)) if len(historical_lead_times) > 1 else historical_mean
         historical_var = max(historical_var, historical_mean)

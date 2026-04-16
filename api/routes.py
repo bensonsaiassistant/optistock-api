@@ -81,16 +81,22 @@ def check_body_size(request: Request) -> None:
 # ── Demand calculation helpers ─────────────────────────────────────────────
 def _historical_to_dict(h) -> dict:
     """Convert HistoricalDataPoint or dict to a standard dict."""
-    return {
-        "date": h.date if hasattr(h, "date") else h["date"],
-        "quantity": h.quantity if hasattr(h, "quantity") else h["quantity"],
-        "available": h.available if hasattr(h, "available") else h.get("available", 1.0),
-        "mercury_order_quantity": (
-            h.mercury_order_quantity
-            if hasattr(h, "mercury_order_quantity")
-            else h.get("mercury_order_quantity", 0.0)
-        ),
-    }
+    if hasattr(h, "date"):
+        # HistoricalDataPoint Pydantic model
+        return {
+            "date": h.date,
+            "quantity": h.quantity,
+            "available": h.available,
+            "mercury_order_quantity": h.mercury_order_quantity,
+        }
+    else:
+        # dict
+        return {
+            "date": h.get("date"),
+            "quantity": h.get("quantity", 0.0),
+            "available": h.get("available", 1.0),
+            "mercury_order_quantity": h.get("mercury_order_quantity", 0.0),
+        }
 
 
 def calculate_demand_from_history(
@@ -112,22 +118,9 @@ def calculate_demand_from_history(
     return ads, variance, source
 
 
-def _calculate_elite_demand_and_lt(item) -> tuple[float, float, float, float, str, str]:
+def _calculate_elite_demand_and_lt(item: "ItemInput") -> tuple[float, float, float, float, str, str]:
     """Elite tier: predict BOTH demand AND lead time from ML."""
-    hist_dict = [
-        {
-            "date": h.date if hasattr(h, "date") else h["date"],
-            "quantity": h.quantity if hasattr(h, "quantity") else h["quantity"],
-            "available": h.available if hasattr(h, "available") else h.get("available", 1.0),
-            "mercury_order_quantity": (
-                h.mercury_order_quantity
-                if hasattr(h, "mercury_order_quantity")
-                else h.get("mercury_order_quantity", 0.0)
-            ),
-        }
-        for h in item.historical_data
-    ]
-
+    hist_dict = [_historical_to_dict(h) for h in item.historical_data]
     historical_lead_times = item.historical_lead_times if item.historical_lead_times else []
 
     try:
@@ -137,26 +130,43 @@ def _calculate_elite_demand_and_lt(item) -> tuple[float, float, float, float, st
             hist_dict, item.item_id, historical_lead_times,
         )
         return ads, var, lt, lt_var, demand_source, lt_source
-    except Exception as e:
+    except (ImportError, ValueError, KeyError) as e:
+        # Expected errors: ML model not available, invalid data, missing keys
         logger.warning("Elite ML prediction failed for %s: %s. Falling back.", item.item_id, e)
 
         if len(hist_dict) >= 60:
-            from demand.ml_predictor import predict_demand_ml
-            ads, var, demand_source = predict_demand_ml(hist_dict, item.item_id)
+            try:
+                from demand.ml_predictor import predict_demand_ml
+                ads, var, demand_source = predict_demand_ml(hist_dict, item.item_id)
+            except (ImportError, ValueError, KeyError):
+                ads, var, demand_source = calculate_demand_from_history(
+                    hist_dict, item.item_id, "basic"
+                )
         elif len(hist_dict) >= 7:
             ads, var, demand_source = calculate_demand_from_history(hist_dict, item.item_id, "basic")
         else:
             ads, var, demand_source = 0.0, 0.0, "insufficient_data"
 
         if historical_lead_times:
-            from demand.lt_predictor import predict_lead_time_ml
-            lt, lt_var, lt_source = predict_lead_time_ml(historical_lead_times, item.item_id)
+            try:
+                from demand.lt_predictor import predict_lead_time_ml
+                lt, lt_var, lt_source = predict_lead_time_ml(
+                    historical_lead_times, item.item_id
+                )
+            except (ImportError, ValueError, KeyError):
+                lt = item.lead_time_days
+                lt_var = 0.0
+                lt_source = "default"
         else:
             lt = item.lead_time_days
             lt_var = 0.0
             lt_source = "default"
 
         return ads, var, lt, lt_var, demand_source, lt_source
+    except Exception as e:
+        # Fallback: unexpected errors — still return safe defaults
+        logger.exception("Unexpected error in elite demand/lead time prediction for %s", item.item_id)
+        return 0.0, 0.0, item.lead_time_days, 0.0, "error", "error"
 
 
 def run_outp_optimization(
@@ -182,7 +192,7 @@ def run_outp_optimization(
     )
 
 
-def run_single_item(item, tier: str, cost_of_capital: float) -> ItemResult:
+def run_single_item(item: "ItemInput", tier: str, cost_of_capital: float) -> ItemResult:
     """Optimize a single item."""
     warnings: list[str] = []
 

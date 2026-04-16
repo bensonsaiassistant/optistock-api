@@ -10,7 +10,8 @@ Cost-optimized configuration:
 
 import modal
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, StaticFiles
+from fastapi.responses import FileResponse
 import pathlib
 
 app = modal.App("optistock-api")
@@ -83,6 +84,15 @@ from api.routes import router, register_security_handlers
 
 register_security_handlers(fastapi_app)
 fastapi_app.include_router(router)
+
+# ── Static file serving for the web UI ───────────────────────────
+fastapi_app.mount("/static", StaticFiles(directory=str(PROJECT_ROOT / "webui")), name="static")
+
+
+@fastapi_app.get("/")
+async def serve_index():
+    """Serve the OptiStock web UI landing page."""
+    return FileResponse(str(PROJECT_ROOT / "webui" / "index.html"))
 
 
 @app.function(
