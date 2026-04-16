@@ -261,12 +261,22 @@ def run_single_item(item: "ItemInput", tier: str, cost_of_capital: float) -> Ite
         optimal_outp - item.current_available - item.on_order_qty + item.back_order_qty,
     )
 
+    # Get full OUTP profit curve for visualization
+    from api.outp_curve import get_outp_curve
+    outp_curve = get_outp_curve(
+        ads=ads, var=var, lt=lt, gm=gm, cost=item.cost,
+        sale_price=item.sale_price, length=item.length, width=item.width,
+        height=item.height, p_terms=item.payment_terms_days,
+        s_terms=item.sales_terms_days,
+        cost_of_capital=cost_of_capital, lt_variance=lt_var,
+    )
+
     return ItemResult(
         item_id=item.item_id,
         optimal_outp=optimal_outp,
         recommended_order_qty=recommended_qty,
         expected_profit=profit,
-        expected_daily_sales=sales,
+        expected_daily_sales=ads,
         expected_avg_inventory=inventory,
         cube_usage=cube,
         profit_per_cube=ppc,
@@ -274,6 +284,7 @@ def run_single_item(item: "ItemInput", tier: str, cost_of_capital: float) -> Ite
         ads=ads,
         variance=var,
         warnings=warnings,
+        outp_curve=outp_curve,
     )
 
 
@@ -350,7 +361,7 @@ def run_batch_outp_optimization(
             optimal_outp=optimal_outp,
             recommended_order_qty=recommended_qty,
             expected_profit=profit,
-            expected_daily_sales=sales,
+            expected_daily_sales=ads,
             expected_avg_inventory=inventory,
             cube_usage=cube,
             profit_per_cube=ppc,
@@ -515,7 +526,7 @@ async def simulate(
         optimal_outp=optimal_outp,
         recommended_order_qty=recommended_qty,
         expected_profit=profit,
-        expected_daily_sales=sales,
+        expected_daily_sales=ads,
         expected_avg_inventory=inventory,
         cube_usage=cube,
         profit_per_cube=ppc,

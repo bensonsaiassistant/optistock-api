@@ -211,6 +211,14 @@
         }
 
         const item = data.items[0];
+        const outpCurve = item.outp_curve || [];
+        const curveChart = outpCurve.length > 0 ? `
+            <div class="result-chart">
+                <h4 style="margin-bottom: 12px;">Profit vs Order Up to Point</h4>
+                <canvas id="outp-chart" height="200"></canvas>
+            </div>
+        ` : '';
+
         container.innerHTML = `
             <h3 style="margin-bottom: 16px; font-size: 1.1rem;">Optimization Results</h3>
             <div class="result-grid">
@@ -223,7 +231,7 @@
                     <div class="value">$${item.expected_profit.toFixed(2)}</div>
                 </div>
                 <div class="result-card">
-                    <h4>Optimal Stock Level</h4>
+                    <h4>Optimal Order Up to Point</h4>
                     <div class="value">${item.optimal_outp.toLocaleString()} units</div>
                 </div>
                 <div class="result-card">
@@ -239,12 +247,109 @@
                     <div class="value">$${item.profit_per_cube.toFixed(2)}</div>
                 </div>
             </div>
+            ${curveChart}
             <div class="result-meta">
                 <span>Demand Source: <code>${item.demand_source}</code></span>
                 <span>Compute Time: <code>${data.compute_time_ms.toFixed(0)}ms</code></span>
                 ${item.warnings && item.warnings.length > 0 ? `<span style="color: #f59e0b;">Warnings: ${item.warnings.join(', ')}</span>` : ''}
             </div>
         `;
+
+        // Draw OUTP profit curve chart
+        if (outpCurve.length > 0) {
+            setTimeout(() => drawOutpChart(outpCurve, item.optimal_outp), 50);
+        }
+    }
+
+    function drawOutpChart(curve, optimalOutp) {
+        const canvas = document.getElementById('outp-chart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width = canvas.offsetWidth;
+        const height = canvas.height = 200;
+        const padding = { top: 20, right: 20, bottom: 35, left: 55 };
+        const chartW = width - padding.left - padding.right;
+        const chartH = height - padding.top - padding.bottom;
+
+        const outps = curve.map(p => p.outp);
+        const profits = curve.map(p => p.profit);
+        const minX = Math.min(...outps);
+        const maxX = Math.max(...outps);
+        const minY = Math.min(...profits);
+        const maxY = Math.max(...profits);
+        const rangeX = maxX - minX || 1;
+        const rangeY = maxY - minY || 1;
+
+        const xScale = (v) => padding.left + ((v - minX) / rangeX) * chartW;
+        const yScale = (v) => padding.top + chartH - ((v - minY) / rangeY) * chartH;
+
+        // Grid
+        ctx.strokeStyle = '#e5e7eb';
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i <= 4; i++) {
+            const y = padding.top + (chartH / 4) * i;
+            ctx.beginPath();
+            ctx.moveTo(padding.left, y);
+            ctx.lineTo(width - padding.right, y);
+            ctx.stroke();
+        }
+
+        // Zero line
+        if (minY < 0 && maxY > 0) {
+            ctx.strokeStyle = '#9ca3af';
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(padding.left, yScale(0));
+            ctx.lineTo(width - padding.right, yScale(0));
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Profit curve
+        ctx.strokeStyle = '#6366f1';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        curve.forEach((p, i) => {
+            const x = xScale(p.outp);
+            const y = yScale(p.profit);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        // Optimal point marker
+        const optY = yScale(curve.find(p => p.outp === optimalOutp)?.profit || maxY);
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(xScale(optimalOutp), optY, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(xScale(optimalOutp), optY, 5, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // X axis labels
+        ctx.fillStyle = '#6b7280';
+        ctx.font = '11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        const step = Math.ceil(rangeX / 6);
+        for (let x = minX; x <= maxX; x += step) {
+            ctx.fillText(x, xScale(x), height - padding.bottom + 18);
+        }
+
+        // Y axis labels
+        ctx.textAlign = 'right';
+        for (let i = 0; i <= 4; i++) {
+            const val = minY + (rangeY / 4) * (4 - i);
+            ctx.fillText('$' + val.toFixed(0), padding.left - 8, padding.top + (chartH / 4) * i + 4);
+        }
+
+        // Axis labels
+        ctx.fillStyle = '#9ca3af';
+        ctx.font = '10px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Order Up to Point (units)', width / 2, height - 4);
     }
 
     // === Load sample data button (if exists) ===

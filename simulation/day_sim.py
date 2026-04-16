@@ -61,6 +61,9 @@ def day_sim(
 
     use_pre_sampled = (ads / var < 0.95) and (var - ads > 0.1) if var > 0 else False
 
+    # Seed Numba's RNG for deterministic results across all OUTP candidates
+    np.random.seed(42)
+
     # --- Scalar state variables ---
     inv = int64(start_inv)       # current on-hand inventory
     oo = int64(0)                # units on order (not yet received)
@@ -82,9 +85,8 @@ def day_sim(
     ar_balance = int64(0)
     ap_balance = int64(0)
 
-    # Warmup period: skip first N days (proportional to starting inventory)
-    warmup_end = int64(start_inv) if ads > 0 else int64(0)
-    warmup_end = min(warmup_end, days)
+    # Warmup period: fixed 30 days to let system stabilize
+    warmup_end = min(int64(30), days)
 
     for i in range(days):
         # 1. Demand

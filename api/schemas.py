@@ -248,6 +248,7 @@ class ItemResult(BaseModel):
     expected_avg_inventory: float
     cube_usage: float
     profit_per_cube: float
+    outp_curve: list = []
     demand_source: str
     ads: float
     variance: float

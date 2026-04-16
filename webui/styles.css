@@ -55,6 +55,8 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);line-height:
 .result-meta{margin-top:16px;padding-top:16px;border-top:1px solid var(--border);font-size:.85rem;color:var(--text-muted)}
 .result-meta span{display:inline-block;margin-right:16px}
 .result-meta code{background:var(--bg-alt);padding:2px 6px;border-radius:4px;font-size:.8rem}
+.result-chart{margin-top:16px;padding:16px;background:var(--card-bg);border-radius:var(--radius);box-shadow:var(--shadow)}
+.result-chart canvas{width:100%;border:none;background:transparent}
 .pricing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;max-width:1000px;margin:0 auto}
 .price-card{background:var(--card-bg);padding:32px;border-radius:var(--radius);box-shadow:var(--shadow);text-align:center;position:relative;border:2px solid transparent;transition:transform .2s,box-shadow .2s}
 .price-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}

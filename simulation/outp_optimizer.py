@@ -214,6 +214,7 @@ def calc_opti_outp(
     outp_values = np.arange(1, outps_to_calc + 1, dtype=np.float64)
 
     # Generate demand samples
+    rng = np.random.RandomState(42)
     use_pre_sampled = (ads / var < 0.95) and (var - ads > 0.1)
     if use_pre_sampled:
         demand_array = calc_nb_array_ln(ads, var)
@@ -222,9 +223,10 @@ def calc_opti_outp(
         demand_sample = numba_choice(demand_size, demand_array, n_to_sample)
         demand_sample = demand_sample.astype(np.int64)
     else:
-        demand_sample = np.random.poisson(ads, days).astype(np.int64)
+        demand_sample = rng.poisson(ads, days).astype(np.int64)
 
     # Generate lead time samples (pure numpy, fast)
+    np.random.seed(99)
     lt_sample = _generate_lead_time_sample(lt, lt_variance, days)
 
     # Run OUTP sweep in single JIT call
