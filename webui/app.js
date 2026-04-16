@@ -93,7 +93,7 @@
         const backOrder = parseInt(document.getElementById('demo-back-order').value) || 0;
         const leadTime = parseInt(document.getElementById('demo-lead-time').value) || 14;
         const orderFreq = parseInt(document.getElementById('demo-order-freq').value) || 7;
-        const coc = parseFloat(document.getElementById('demo-coc').value) || 14;
+        const coc = parseFloat(document.getElementById('demo-coc').value) || 5;
         const length = parseFloat(document.getElementById('demo-length').value) || 1.0;
         const width = parseFloat(document.getElementById('demo-width').value) || 1.0;
         const height = parseFloat(document.getElementById('demo-height').value) || 1.0;

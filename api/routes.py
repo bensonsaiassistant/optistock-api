@@ -102,7 +102,11 @@ def _historical_to_dict(h) -> dict:
 def calculate_demand_from_history(
     historical_data: list, item_id: str, tier: str
 ) -> tuple[float, float, str]:
-    """Calculate ads and variance from historical data."""
+    """Calculate ads and variance from historical data.
+
+    For datasets with < 60 data points, uses a simple mean/variance
+    (the rolling windows need ~60 days to converge).
+    """
     if not historical_data or len(historical_data) < 7:
         return 0.0, 0.0, "insufficient_data"
 
@@ -112,6 +116,17 @@ def calculate_demand_from_history(
     if tier in ("premium", "elite") and len(hist_dict) >= 60:
         from demand.ml_predictor import predict_demand_ml
         return predict_demand_ml(hist_dict, item_id)
+
+    # Short dataset — use simple average instead of rolling windows
+    if len(hist_dict) < 60:
+        import numpy as np
+        quantities = [h["quantity"] for h in hist_dict if "quantity" in h]
+        if quantities:
+            ads = float(np.mean(quantities))
+            variance = float(np.var(quantities, ddof=1)) if len(quantities) > 1 else ads
+            variance = max(variance, 0.0)
+            return ads, variance, "short_dataset_avg"
+        return 0.0, 0.0, "insufficient_data"
 
     from demand.adjusted_demand import calculate_demand_from_history as adj_demand
     ads, variance, source = adj_demand(hist_dict)

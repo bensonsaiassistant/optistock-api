@@ -209,7 +209,7 @@ class ItemInput(BaseModel):
 
 class OptimizeRequest(BaseModel):
     items: list[ItemInput]
-    cost_of_capital: float = 0.14
+    cost_of_capital: float = 0.05
     tier: str = "basic"
 
     @field_validator("cost_of_capital", mode="before")
@@ -295,7 +295,7 @@ class SimulateRequest(BaseModel):
     height: float = 1.0
     payment_terms_days: int = 30
     sales_terms_days: int = 30
-    cost_of_capital: float = 0.14
+    cost_of_capital: float = 0.05
     net_profit_per_unit: float | None = None  # gm after freight, returns, etc.
     current_available: int = 0
     on_order_qty: int = 0
