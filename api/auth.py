@@ -3,6 +3,7 @@
 - API keys are SHA-256 hashed before storage/comparison.
 - Constant-time comparison via hmac.compare_digest prevents timing attacks.
 - Simple in-memory sliding-window rate limiter per API key.
+- Supports both env var keys (legacy) and user database keys.
 """
 
 import hashlib
@@ -56,22 +57,14 @@ def _check_rate_limit(key_hash: str) -> None:
 
 
 def _prune_rate_log() -> None:
-    """Remove expired entries from the rate limiter to prevent memory leaks.
-
-    The rate log grows unbounded as new API keys make requests. This function
-    cleans up entries that have no recent activity. Called every 100 requests
-    to avoid per-request overhead.
-    """
+    """Remove expired entries from the rate limiter to prevent memory leaks."""
     now = time.monotonic()
-    cutoff = now - _RATE_WINDOW_SECONDS * 2  # keep 2x the window for safety
-    # Get list of keys to avoid modifying dict during iteration
+    cutoff = now - _RATE_WINDOW_SECONDS * 2
     keys_to_check = list(_request_log.keys())
     for key in keys_to_check:
         timestamps = _request_log[key]
-        # Remove timestamps outside the extended window
         while timestamps and timestamps[0] < cutoff:
             timestamps.pop(0)
-        # Remove empty entries entirely
         if not timestamps:
             del _request_log[key]
 
@@ -111,36 +104,45 @@ def validate_api_key_format(api_key: str | None) -> str:
 async def validate_api_key(request: Request) -> str:
     """FastAPI dependency: validate and rate-limit the API key.
 
-    In dev mode (no keys configured), passes through after rate-limit check.
-    Returns the **raw** API key from the header (never stored).
+    Checks in order:
+    1. No key provided → allow as demo/unauthenticated access
+    2. Env var keys (legacy deployment mode)
+    3. User database keys (SaaS mode)
+
+    Returns the raw API key from the header, or "demo-unauthenticated".
     """
     global _rate_prune_counter
 
     raw_key = request.headers.get("X-API-Key")
 
-    if not _VALID_KEY_HASHES:
-        # Dev mode: no keys configured — still validate format and rate-limit
-        if raw_key:
-            validate_api_key_format(raw_key)
-            key_hash = _hash_key(raw_key)
-            _check_rate_limit(key_hash)
-        # Periodic prune to prevent memory leak in the rate log
-        _rate_prune_counter += 1
-        if _rate_prune_counter >= _RATE_PRUNE_INTERVAL:
-            _prune_rate_log()
-            _rate_prune_counter = 0
-        return raw_key or "dev-unauthenticated"
+    # No key provided → demo access
+    if not raw_key:
+        return "demo-unauthenticated"
 
-    key = validate_api_key_format(raw_key)
-    key_hash = _hash_key(key)
+    # Validate format first
+    try:
+        validate_api_key_format(raw_key)
+    except HTTPException:
+        raise  # Format is invalid, reject immediately
 
-    # Constant-time comparison against all stored hashes
+    key_hash = _hash_key(raw_key)
     is_valid = False
-    for stored_hash in _VALID_KEY_HASHES:
-        if hmac.compare_digest(key_hash, stored_hash):
-            is_valid = True
-            break
 
+    # Check env var keys first (legacy mode)
+    if _VALID_KEY_HASHES:
+        for stored_hash in _VALID_KEY_HASHES:
+            if hmac.compare_digest(key_hash, stored_hash):
+                is_valid = True
+                break
+
+    # Check user database keys (SaaS mode)
+    if not is_valid:
+        from . import users as user_manager
+        user = await user_manager.validate_api_key(raw_key)
+        if user:
+            is_valid = True
+
+    # Allow if either check passed
     if not is_valid:
         raise HTTPException(
             status_code=401,
@@ -155,4 +157,4 @@ async def validate_api_key(request: Request) -> str:
         _prune_rate_log()
         _rate_prune_counter = 0
 
-    return key
+    return raw_key

@@ -117,15 +117,15 @@ async def signup(request: SignupRequest):
             detail={"error": str(e), "code": "EMAIL_EXISTS"},
         )
 
-    # Generate email verification token (don't await — fire and forget)
+    # Auto-verify for now (no email service configured yet)
     try:
-        await user_manager.generate_verification_token(user["id"])
+        await user_manager.verify_email_now(user["id"])
     except Exception as e:
-        logger.warning("Failed to generate verification token: %s", e)
+        logger.warning("Failed to auto-verify user: %s", e)
 
     return {
         "user_id": user["id"],
-        "message": "Account created successfully. Please check your email to verify.",
+        "message": "Account created successfully. You're ready to go!",
     }
 
 

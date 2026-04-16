@@ -241,6 +241,19 @@ async def verify_email_token(token: str, user_id: str) -> bool:
     return True
 
 
+async def verify_email_now(user_id: str) -> bool:
+    """Mark a user's email as verified without requiring a token.
+
+    Used during signup since we don't have an email service yet.
+    """
+    db = await _get_db()
+    await db.execute(
+        "UPDATE users SET is_verified = 1 WHERE id = ?", (user_id,)
+    )
+    await db.commit()
+    return True
+
+
 # ── API Key management ────────────────────────────────────────────────────
 def _hash_api_key(plaintext: str) -> str:
     """SHA-256 hash of an API key."""

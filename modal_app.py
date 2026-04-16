@@ -50,7 +50,6 @@ image = (
     .add_local_dir(
         WEBUI_DIR,
         remote_path="/root/webui",
-        ignore=lambda x: False,  # force rebuild
     )
 )
 
