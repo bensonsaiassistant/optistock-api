@@ -150,4 +150,4 @@ def day_sim(
     ])
 # rebuild trigger 2026-04-17
 # rebuild trigger 2026-04-17-0230
-# rebuild-trigger-20260417-v4
+# rebuild-trigger-20260417-v5
