@@ -148,3 +148,4 @@ def day_sim(
         sum_ap / count,
         sum_deval / count,
     ])
+# rebuild trigger 2026-04-17
