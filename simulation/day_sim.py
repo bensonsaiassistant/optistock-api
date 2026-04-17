@@ -85,8 +85,10 @@ def day_sim(
     ar_balance = int64(0)
     ap_balance = int64(0)
 
-    # Warmup period: fixed 30 days to let system stabilize
-    warmup_end = min(int64(30), days)
+    # Warmup period: enough time for several order cycles to stabilize
+    # At least 2 lead times + 3 order frequencies, or 30 days minimum
+    warmup_days = min(int64(2) * lt + int64(3) * int64(7), int64(100))
+    warmup_end = min(warmup_days, days)
 
     for i in range(days):
         # 1. Demand

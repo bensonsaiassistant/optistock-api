@@ -250,11 +250,11 @@ def run_outp_optimization(
 
     # Truncate curve at peak + buffer, then downsample
     peak_idx = best_idx
-    max_idx = min(peak_idx + 10, len(results) - 1)
+    max_idx = min(peak_idx + 15, len(results) - 1)
     relevant = results[:max_idx + 1]
     n = len(relevant)
-    if n > 40:
-        step = max(1, n // 40)
+    if n > 50:
+        step = max(1, n // 50)
         sampled = relevant[::step]
         peak_in = any(int(s[0]) == int(results[peak_idx, 0]) for s in sampled)
         if not peak_in:
