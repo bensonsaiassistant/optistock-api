@@ -4,6 +4,16 @@
     // === Config ===
     const API_BASE = window.OPTISTOCK_API_URL || '';
 
+    // === Mobile Nav Toggle ===
+    const navToggle = document.getElementById('nav-toggle');
+    if (navToggle) {
+        navToggle.addEventListener('click', () => {
+            const navLinks = document.getElementById('nav-links');
+            if (navLinks) navLinks.classList.toggle('open');
+            navToggle.setAttribute('aria-expanded', navLinks?.classList.contains('open') ? 'true' : 'false');
+        });
+    }
+
     // === Smooth Scroll ===
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
         anchor.addEventListener('click', function(e) {
