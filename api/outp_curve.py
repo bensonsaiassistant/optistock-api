@@ -51,24 +51,40 @@ def get_outp_curve(
     if results.shape[0] > 1:
         results = results[1:]
 
-    # Find peak profit and truncate curve shortly after it
+    # Find peak profit
     peak_idx = int(np.argmax(results[:, 1]))
-    # Include a small buffer past peak (~10 units) for visual context
-    max_idx = min(peak_idx + 10, len(results) - 1)
-    # Only keep the relevant portion of the curve
-    relevant = results[:max_idx + 1]
+    peak_profit = float(results[peak_idx, 1])
+    peak_outp = int(results[peak_idx, 0])
 
-    # Downsample to ~40 points for efficient API response
-    n = len(relevant)
+    # Extend with linear carrying-cost tail past the peak
+    carry_slope = cost * cost_of_capital / 365.0
+    if carry_slope > 0:
+        tail_len = int(peak_profit / carry_slope) + 5
+        tail_len = min(tail_len, 200)
+        max_outp = peak_outp + tail_len
+
+        all_points = []
+        n_sim = len(results)
+        for r in results:
+            all_points.append((int(r[0]), float(r[1])))
+        for outp in range(max(n_sim, peak_outp + 1), max_outp + 1):
+            profit = peak_profit - carry_slope * (outp - peak_outp)
+            if profit < 0:
+                break
+            all_points.append((outp, profit))
+    else:
+        all_points = [(int(r[0]), float(r[1])) for r in results]
+
+    # Downsample to ~40 points
+    n = len(all_points)
     if n > 40:
         step = max(1, n // 40)
-        sampled = relevant[::step]
-        # Ensure peak is included
-        peak_in_sample = any(int(s[0]) == int(results[peak_idx, 0]) for s in sampled)
-        if not peak_in_sample and peak_idx < n:
-            sampled = np.vstack([sampled, results[peak_idx:peak_idx+1]])
-            sampled = sampled[np.argsort(sampled[:, 0])]
+        sampled = all_points[::step]
+        peak_in = any(s[0] == peak_outp for s in sampled)
+        if not peak_in:
+            sampled.append((peak_outp, peak_profit))
+            sampled.sort(key=lambda x: x[0])
     else:
-        sampled = relevant
+        sampled = all_points
 
-    return [{"outp": int(r[0]), "profit": float(r[1])} for r in sampled]
+    return [{"outp": p, "profit": pr} for p, pr in sampled]

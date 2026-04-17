@@ -248,22 +248,46 @@ def run_outp_optimization(
     if not return_curve:
         return base
 
-    # Truncate curve at peak + buffer, then downsample
+    # Build curve: all simulated points + linear tail extension past peak
     peak_idx = best_idx
-    max_idx = min(peak_idx + 15, len(results) - 1)
-    relevant = results[:max_idx + 1]
-    n = len(relevant)
-    if n > 50:
-        step = max(1, n // 50)
-        sampled = relevant[::step]
-        peak_in = any(int(s[0]) == int(results[peak_idx, 0]) for s in sampled)
-        if not peak_in:
-            sampled = np.vstack([sampled, results[peak_idx:peak_idx+1]])
-            sampled = sampled[np.argsort(sampled[:, 0])]
-    else:
-        sampled = relevant
+    peak_profit = float(results[peak_idx, 1])
+    peak_outp = int(results[peak_idx, 0])
 
-    curve = [{"outp": int(r[0]), "profit": float(r[1])} for r in sampled]
+    # Carry cost slope for linear tail: each extra OUTP unit costs ~cost * coc / 365 per day
+    carry_slope = cost * cost_of_capital / 365.0
+
+    if carry_slope > 0:
+        # Extend analytically to where profit ≈ 0
+        tail_len = int(peak_profit / carry_slope) + 5
+        tail_len = min(tail_len, 200)  # cap extension
+        max_outp = peak_outp + tail_len
+
+        # Merge simulated + tail (use simulated where available)
+        n_sim = len(results)
+        all_points = []
+        for r in results:
+            all_points.append((int(r[0]), float(r[1])))
+        for outp in range(max(n_sim, peak_outp + 1), max_outp + 1):
+            profit = peak_profit - carry_slope * (outp - peak_outp)
+            if profit < 0:
+                break
+            all_points.append((outp, profit))
+    else:
+        all_points = [(int(r[0]), float(r[1])) for r in results]
+
+    # Downsample to ~40 points
+    n = len(all_points)
+    if n > 40:
+        step = max(1, n // 40)
+        sampled = all_points[::step]
+        peak_in = any(s[0] == peak_outp for s in sampled)
+        if not peak_in:
+            sampled.append((peak_outp, peak_profit))
+            sampled.sort(key=lambda x: x[0])
+    else:
+        sampled = all_points
+
+    curve = [{"outp": p, "profit": pr} for p, pr in sampled]
     return base + (curve,)
 
 
