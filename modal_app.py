@@ -37,7 +37,7 @@ image = (
         "scikit-learn>=1.3.0",
         "polars>=0.20.0",
         "stripe>=5.0.0",
-        "modal>=0.60.0",
+        "modal>=0.60.0"  # force-rebuild-20260417,
         # webui v3 - 2026-04-17
         "bcrypt>=4.0.0",
         "pyjwt>=2.0.0",
