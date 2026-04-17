@@ -13,7 +13,7 @@
     <nav class="nav">
         <div class="nav-inner">
             <a href="#" class="logo">📦 OptiStock</a>
-            <div class="nav-links">
+            <div class="nav-links" id="nav-links">
                 <a href="#how-it-works">How It Works</a>
                 <a href="#demo">Try It</a>
                 <a href="#pricing">Pricing</a>
@@ -21,7 +21,7 @@
                 <a href="/static/login.html">Sign In</a>
                 <a href="/static/signup.html" class="nav-cta">Sign Up</a>
             </div>
-            <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')">☰</button>
+            <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">☰</button>
         </div>
     </nav>
 
@@ -36,15 +36,15 @@
             </div>
             <div class="hero-stats">
                 <div class="stat">
-                    <div class="stat-num" data-target="15">0%</div>
+                    <div class="stat-value"><span class="stat-num" data-target="15" data-suffix="%">0%</span></div>
                     <div class="stat-label">Average Profit Increase</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-num" data-target="23">0%</div>
+                    <div class="stat-value"><span class="stat-num" data-target="23" data-suffix="%">0%</span></div>
                     <div class="stat-label">Less Overstock</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-num" data-target="100">0K+</div>
+                    <div class="stat-value"><span class="stat-num" data-target="100" data-suffix="K+">0K+</span></div>
                     <div class="stat-label">Simulations Per Run</div>
                 </div>
             </div>
@@ -83,91 +83,104 @@
             <p class="section-sub">See OptiStock in action with sample data — no sign-up required</p>
             <div class="demo-grid">
                 <div class="demo-form">
+                    <!-- Core fields (always visible) -->
                     <div class="form-row">
-                        <label>Item ID</label>
+                        <label for="demo-item-id">Item ID</label>
                         <input type="text" id="demo-item-id" value="SKU-001">
                     </div>
                     <div class="form-row-2">
                         <div class="form-row">
-                            <label>Unit Cost ($)</label>
+                            <label for="demo-cost">Unit Cost ($)</label>
                             <input type="number" id="demo-cost" value="12.50" step="0.01" min="0">
                         </div>
                         <div class="form-row">
-                            <label>Sale Price ($)</label>
+                            <label for="demo-price">Sale Price ($)</label>
                             <input type="number" id="demo-price" value="29.99" step="0.01" min="0">
                         </div>
                     </div>
                     <div class="form-row">
-                        <label>Net Profit Per Unit ($) — <em>after freight, returns, etc. Leave blank to auto-calc (sale price − unit cost)</em></label>
-                        <input type="number" id="demo-net-profit" value="" step="0.01" placeholder="Auto: 17.49">
-                    </div>
-                    <div class="form-row-2">
-                        <div class="form-row">
-                            <label>Current Stock</label>
-                            <input type="number" id="demo-stock" value="150" min="0">
-                        </div>
-                        <div class="form-row">
-                            <label>On Order</label>
-                            <input type="number" id="demo-on-order" value="0" min="0">
-                        </div>
-                    </div>
-                    <div class="form-row-2">
-                        <div class="form-row">
-                            <label>Lead Time (days)</label>
-                            <input type="number" id="demo-lead-time" value="14" min="0">
-                        </div>
-                        <div class="form-row">
-                            <label>Order Frequency (days)</label>
-                            <input type="number" id="demo-order-freq" value="7" min="1">
-                        </div>
-                    </div>
-                    <div class="form-row-3">
-                        <div class="form-row">
-                            <label>Length (units)</label>
-                            <input type="number" id="demo-length" value="1.0" step="0.1" min="0">
-                        </div>
-                        <div class="form-row">
-                            <label>Width (units)</label>
-                            <input type="number" id="demo-width" value="1.0" step="0.1" min="0">
-                        </div>
-                        <div class="form-row">
-                            <label>Height (units)</label>
-                            <input type="number" id="demo-height" value="1.0" step="0.1" min="0">
-                        </div>
-                    </div>
-                    <div class="form-row-2">
-                        <div class="form-row">
-                            <label>Back Order Qty</label>
-                            <input type="number" id="demo-back-order" value="0" min="0">
-                        </div>
-                        <div class="form-row">
-                            <label>Cost of Capital (%)</label>
-                            <input type="number" id="demo-coc" value="5" step="0.5" min="0" max="100">
-                        </div>
-                    </div>
-                    <div class="form-row-2">
-                        <div class="form-row">
-                            <label>Payment Terms (days)</label>
-                            <input type="number" id="demo-payment-terms" value="30" min="0">
-                        </div>
-                        <div class="form-row">
-                            <label>Sales Terms (days)</label>
-                            <input type="number" id="demo-sales-terms" value="30" min="0">
-                        </div>
+                        <label for="demo-stock">Current Stock</label>
+                        <input type="number" id="demo-stock" value="150" min="0">
                     </div>
                     <div class="form-row">
-                        <label>Historical Daily Sales (comma-separated numbers)</label>
-                        <textarea id="demo-historical" rows="4">5, 7, 3, 8, 6, 4, 9, 7, 5, 6, 8, 3, 7, 5, 4, 6, 8, 7, 5, 9, 6, 4, 7, 5, 8, 6, 3, 7, 5, 4, 6, 8, 7, 5, 9, 6, 4, 7, 5, 8, 6, 3, 7, 5, 4, 6, 8, 7, 5, 9, 6, 4, 7, 5, 8, 6, 3, 7, 5, 4, 6, 8, 7, 5, 9, 6, 4, 7, 5, 8, 6, 3, 7, 5, 4, 6, 8, 7, 5, 9, 6, 4, 7, 5, 8, 6, 3, 7, 5, 4</textarea>
+                        <label for="demo-lead-time">Lead Time (days)</label>
+                        <input type="number" id="demo-lead-time" value="14" min="0">
                     </div>
-                    <div class="form-row">
-                        <label>Tier</label>
-                        <select id="demo-tier">
-                            <option value="basic" selected>Basic (Rolling Averages)</option>
-                            <option value="premium">Premium (ML + XGBoost)</option>
-                            <option value="elite">Elite (ML Demand + ML Lead Time)</option>
-                        </select>
-                    </div>
-                    <button id="demo-btn" class="btn btn-primary btn-full" onclick="runDemo()">Optimize Now</button>
+
+                    <!-- Advanced fields accordion -->
+                    <details class="form-accordion" id="advanced-fields">
+                        <summary class="accordion-toggle">
+                            <span>Advanced Options</span>
+                            <span class="accordion-icon" aria-hidden="true">▾</span>
+                        </summary>
+                        <div class="accordion-content">
+                            <div class="form-row">
+                                <label for="demo-net-profit">Net Profit Per Unit ($) <em class="field-hint">Leave blank to auto-calc</em></label>
+                                <input type="number" id="demo-net-profit" value="" step="0.01" placeholder="Auto: 17.49">
+                            </div>
+                            <div class="form-row-2">
+                                <div class="form-row">
+                                    <label for="demo-on-order">On Order</label>
+                                    <input type="number" id="demo-on-order" value="0" min="0">
+                                </div>
+                                <div class="form-row">
+                                    <label for="demo-order-freq">Order Frequency (days)</label>
+                                    <input type="number" id="demo-order-freq" value="7" min="1">
+                                </div>
+                            </div>
+                            <fieldset class="form-fieldset">
+                                <legend>Dimensions (units)</legend>
+                                <div class="form-row-3">
+                                    <div class="form-row">
+                                        <label for="demo-length">Length</label>
+                                        <input type="number" id="demo-length" value="1.0" step="0.1" min="0">
+                                    </div>
+                                    <div class="form-row">
+                                        <label for="demo-width">Width</label>
+                                        <input type="number" id="demo-width" value="1.0" step="0.1" min="0">
+                                    </div>
+                                    <div class="form-row">
+                                        <label for="demo-height">Height</label>
+                                        <input type="number" id="demo-height" value="1.0" step="0.1" min="0">
+                                    </div>
+                                </div>
+                            </fieldset>
+                            <div class="form-row-2">
+                                <div class="form-row">
+                                    <label for="demo-back-order">Back Order Qty</label>
+                                    <input type="number" id="demo-back-order" value="0" min="0">
+                                </div>
+                                <div class="form-row">
+                                    <label for="demo-coc">Cost of Capital (%)</label>
+                                    <input type="number" id="demo-coc" value="5" step="0.5" min="0" max="100">
+                                </div>
+                            </div>
+                            <div class="form-row-2">
+                                <div class="form-row">
+                                    <label for="demo-payment-terms">Payment Terms (days)</label>
+                                    <input type="number" id="demo-payment-terms" value="30" min="0">
+                                </div>
+                                <div class="form-row">
+                                    <label for="demo-sales-terms">Sales Terms (days)</label>
+                                    <input type="number" id="demo-sales-terms" value="30" min="0">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <label for="demo-historical">Historical Daily Sales <em class="field-hint">(comma-separated)</em></label>
+                                <textarea id="demo-historical" rows="4">5, 7, 3, 8, 6, 4, 9, 7, 5, 6, 8, 3, 7, 5, 4, 6, 8, 7, 5, 9, 6, 4, 7, 5, 8, 6, 3, 7, 5, 4, 6, 8, 7, 5, 9, 6, 4, 7, 5, 8, 6, 3, 7, 5, 4, 6, 8, 7, 5, 9, 6, 4, 7, 5, 8, 6, 3, 7, 5, 4, 6, 8, 7, 5, 9, 6, 4, 7, 5, 8, 6, 3, 7, 5, 4, 6, 8, 7, 5, 9, 6, 4, 7, 5, 8, 6, 3, 7, 5, 4</textarea>
+                            </div>
+                            <div class="form-row">
+                                <label for="demo-tier">Tier</label>
+                                <select id="demo-tier">
+                                    <option value="basic" selected>Basic (Rolling Averages)</option>
+                                    <option value="premium">Premium (ML + XGBoost)</option>
+                                    <option value="elite">Elite (ML Demand + ML Lead Time)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </details>
+
+                    <button id="demo-btn" class="btn btn-primary btn-full" onclick="runDemo()">⚡ Optimize Now</button>
                 </div>
 
                 <div class="demo-results" id="demo-results">
