@@ -38,7 +38,7 @@ image = (
         "polars>=0.20.0",
         "stripe>=5.0.0",
         "modal>=0.60.0",
-        # webui v2 - 2026-04-16
+        # webui v3 - 2026-04-17
         "bcrypt>=4.0.0",
         "pyjwt>=2.0.0",
         "email-validator>=2.0.0",
@@ -108,8 +108,25 @@ fastapi_app.include_router(billing_router)
 @modal.asgi_app()
 def api_server():
     """Serve the full FastAPI app on Modal."""
+    from starlette.responses import Response
+    from starlette.middleware.base import BaseHTTPMiddleware
+
+    class NoCacheMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            response = await call_next(request)
+            if request.url.path.startswith("/static/") or request.url.path == "/":
+                response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+                response.headers["Pragma"] = "no-cache"
+                response.headers["Expires"] = "0"
+            return response
+
+    fastapi_app.add_middleware(NoCacheMiddleware)
+
     # Mount web UI static files (deferred to container runtime)
     fastapi_app.mount("/static", StaticFiles(directory=str(CONTAINER_WEBUI)), name="static")
+
+    CACHE_BUST = "20260417v3"
+
     @fastapi_app.get("/")
     async def serve_index():
         return FileResponse(str(CONTAINER_WEBUI / "index.html"))
