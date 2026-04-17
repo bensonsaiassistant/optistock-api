@@ -9,6 +9,7 @@ Inventory flow per day:
 4. **Receipts** arrive after lead time days.
 5. **Financials** track accounts receivable, payable, and devaluation.
 """
+# rebuild-marker-20260417-0230
 
 import numpy as np
 import math as m
