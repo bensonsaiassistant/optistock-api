@@ -189,22 +189,82 @@ def run_outp_optimization(
     sale_price: float, length: float, width: float, height: float,
     p_terms: int, s_terms: int, cost_of_capital: float,
     lt_variance: float = 0.0,
+    return_curve: bool = False,
 ) -> tuple:
-    """Run the OUTP (Order Up To Point) optimization simulation."""
+    """Run the OUTP (Order Up To Point) optimization simulation.
+
+    When return_curve=False (default): returns (optimal_outp, profit, inventory, sales, cube, ppc)
+    When return_curve=True: returns (..., curve_data) where curve_data is truncated profit curve.
+    """
     from simulation.outp_optimizer import calc_opti_outp
+    from simulation.outp_optimizer import _calc_opti_outp_inner
+    from simulation.outp_optimizer import _generate_lead_time_sample
+    from simulation.demand_dist import calc_nb_array_ln, numba_choice
+    from numba import int64
 
-    result = calc_opti_outp(
-        ads=ads, var=var, lt=lt, gm=gm, cost=cost,
-        avg_sale_price=sale_price, length=length, width=width, height=height,
-        p_terms=p_terms, s_terms=s_terms, min_of_1=1,
-        cost_of_capital=cost_of_capital,
-        lt_variance=lt_variance,
+    days = 200
+    lt_int = int(round(lt))
+    outps_to_calc = int(max(1, ads) * max(1, lt) * 3)
+    outps_to_calc = max(outps_to_calc, 1)
+    outp_values = np.arange(1, outps_to_calc + 1, dtype=np.float64)
+
+    # Deterministic demand samples
+    rng = np.random.RandomState(42)
+    use_pre_sampled = (ads / var < 0.95) and (var - ads > 0.1)
+    if use_pre_sampled:
+        demand_array = calc_nb_array_ln(ads, var)
+        demand_size = np.arange(demand_array.size)
+        n_to_sample = min(days, demand_array.size)
+        demand_sample = numba_choice(demand_size, demand_array, n_to_sample)
+        demand_sample = demand_sample.astype(np.int64)
+    else:
+        demand_sample = rng.poisson(ads, days).astype(np.int64)
+
+    np.random.seed(99)
+    lt_sample = _generate_lead_time_sample(lt, lt_variance, days)
+
+    # Single sweep — use for both best result and curve
+    results = _calc_opti_outp_inner(
+        outp_values, ads, var, int64(lt_int), gm, cost,
+        sale_price, length, width, height,
+        int64(p_terms), int64(s_terms), int64(days),
+        demand_sample, lt_sample, cost_of_capital,
     )
 
-    return (
-        int(result[0]), float(result[1]), float(result[2]),
-        float(result[3]), float(result[4]), float(result[5]),
+    if results.shape[0] > 1:
+        results = results[1:]
+
+    if results.shape[0] == 0:
+        base = (0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        return base + ([],) if return_curve else base
+
+    best_idx = int(np.argmax(results[:, 1]))
+    best = results[best_idx]
+    base = (
+        int(best[0]), float(best[1]), float(best[2]),
+        float(best[3]), float(best[4]), float(best[5]),
     )
+
+    if not return_curve:
+        return base
+
+    # Truncate curve at peak + buffer, then downsample
+    peak_idx = best_idx
+    max_idx = min(peak_idx + 10, len(results) - 1)
+    relevant = results[:max_idx + 1]
+    n = len(relevant)
+    if n > 40:
+        step = max(1, n // 40)
+        sampled = relevant[::step]
+        peak_in = any(int(s[0]) == int(results[peak_idx, 0]) for s in sampled)
+        if not peak_in:
+            sampled = np.vstack([sampled, results[peak_idx:peak_idx+1]])
+            sampled = sampled[np.argsort(sampled[:, 0])]
+    else:
+        sampled = relevant
+
+    curve = [{"outp": int(r[0]), "profit": float(r[1])} for r in sampled]
+    return base + (curve,)
 
 
 def run_single_item(item: "ItemInput", tier: str, cost_of_capital: float) -> ItemResult:
@@ -247,28 +307,19 @@ def run_single_item(item: "ItemInput", tier: str, cost_of_capital: float) -> Ite
             ads=ads, variance=var, warnings=warnings,
         )
 
-    optimal_outp, profit, inventory, sales, cube, ppc = run_outp_optimization(
+    optimal_outp, profit, inventory, sales, cube, ppc, outp_curve = run_outp_optimization(
         ads=ads, var=var, lt=lt, gm=gm, cost=item.cost,
         sale_price=item.sale_price, length=item.length, width=item.width,
         height=item.height, p_terms=item.payment_terms_days,
         s_terms=item.sales_terms_days,
         cost_of_capital=cost_of_capital,
         lt_variance=lt_var,
+        return_curve=True,
     )
 
     recommended_qty = max(
         0,
         optimal_outp - item.current_available - item.on_order_qty + item.back_order_qty,
-    )
-
-    # Get full OUTP profit curve for visualization
-    from api.outp_curve import get_outp_curve
-    outp_curve = get_outp_curve(
-        ads=ads, var=var, lt=lt, gm=gm, cost=item.cost,
-        sale_price=item.sale_price, length=item.length, width=item.width,
-        height=item.height, p_terms=item.payment_terms_days,
-        s_terms=item.sales_terms_days,
-        cost_of_capital=cost_of_capital, lt_variance=lt_var,
     )
 
     return ItemResult(

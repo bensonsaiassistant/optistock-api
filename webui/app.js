@@ -274,92 +274,126 @@
     function drawOutpChart(curve, optimalOutp) {
         const canvas = document.getElementById('outp-chart');
         if (!canvas) return;
+        const dpr = window.devicePixelRatio || 1;
+        const displayWidth = canvas.offsetWidth;
+        const displayHeight = 240;
+        canvas.width = displayWidth * dpr;
+        canvas.height = displayHeight * dpr;
+        canvas.style.height = displayHeight + 'px';
         const ctx = canvas.getContext('2d');
-        const width = canvas.width = canvas.offsetWidth;
-        const height = canvas.height = 200;
-        const padding = { top: 20, right: 20, bottom: 35, left: 55 };
-        const chartW = width - padding.left - padding.right;
-        const chartH = height - padding.top - padding.bottom;
+        ctx.scale(dpr, dpr);
+        const width = displayWidth;
+        const height = displayHeight;
 
-        const outps = curve.map(p => p.outp);
-        const profits = curve.map(p => p.profit);
-        const minX = Math.min(...outps);
-        const maxX = Math.max(...outps);
-        const minY = Math.min(...profits);
-        const maxY = Math.max(...profits);
-        const rangeX = maxX - minX || 1;
-        const rangeY = maxY - minY || 1;
+        const pad = { top: 28, right: 24, bottom: 42, left: 60 };
+        const cw = width - pad.left - pad.right;
+        const ch = height - pad.top - pad.bottom;
 
-        const xScale = (v) => padding.left + ((v - minX) / rangeX) * chartW;
-        const yScale = (v) => padding.top + chartH - ((v - minY) / rangeY) * chartH;
+        const xs = curve.map(p => p.outp);
+        const ys = curve.map(p => p.profit);
+        const xMin = xs[0], xMax = xs[xs.length - 1];
+        const yMin = Math.min(0, ...ys);
+        const yMax = Math.max(...ys);
+        const rx = xMax - xMin || 1;
+        const ry = yMax - yMin || 1;
+        const xS = v => pad.left + ((v - xMin) / rx) * cw;
+        const yS = v => pad.top + ch - ((v - yMin) / ry) * ch;
 
-        // Grid
-        ctx.strokeStyle = '#e5e7eb';
+        // Background
+        ctx.fillStyle = '#fafbfc';
+        ctx.fillRect(0, 0, width, height);
+
+        // Subtle grid
+        ctx.strokeStyle = '#e8ecf0';
         ctx.lineWidth = 0.5;
-        for (let i = 0; i <= 4; i++) {
-            const y = padding.top + (chartH / 4) * i;
-            ctx.beginPath();
-            ctx.moveTo(padding.left, y);
-            ctx.lineTo(width - padding.right, y);
-            ctx.stroke();
-        }
+        const yTicks = niceScale(yMin, yMax, 5);
+        yTicks.forEach(v => {
+            const y = yS(v);
+            ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
+        });
 
         // Zero line
-        if (minY < 0 && maxY > 0) {
-            ctx.strokeStyle = '#9ca3af';
-            ctx.setLineDash([4, 4]);
-            ctx.beginPath();
-            ctx.moveTo(padding.left, yScale(0));
-            ctx.lineTo(width - padding.right, yScale(0));
-            ctx.stroke();
+        if (yMin < 0) {
+            ctx.strokeStyle = '#c0c5cc';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 3]);
+            ctx.beginPath(); ctx.moveTo(pad.left, yS(0)); ctx.lineTo(width - pad.right, yS(0)); ctx.stroke();
             ctx.setLineDash([]);
         }
 
-        // Profit curve
+        // Gradient fill under curve
+        const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + ch);
+        grad.addColorStop(0, 'rgba(99,102,241,0.18)');
+        grad.addColorStop(1, 'rgba(99,102,241,0.01)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(xS(xs[0]), yS(0 > yMin ? 0 : yMin));
+        curve.forEach(p => ctx.lineTo(xS(p.outp), yS(p.profit)));
+        ctx.lineTo(xS(xs[xs.length - 1]), yS(0 > yMin ? 0 : yMin));
+        ctx.closePath();
+        ctx.fill();
+
+        // Smooth curve
         ctx.strokeStyle = '#6366f1';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
         ctx.beginPath();
         curve.forEach((p, i) => {
-            const x = xScale(p.outp);
-            const y = yScale(p.profit);
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
+            const x = xS(p.outp), y = yS(p.profit);
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
         });
         ctx.stroke();
 
-        // Optimal point marker
-        const optY = yScale(curve.find(p => p.outp === optimalOutp)?.profit || maxY);
-        ctx.fillStyle = '#ef4444';
-        ctx.beginPath();
-        ctx.arc(xScale(optimalOutp), optY, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(xScale(optimalOutp), optY, 5, 0, Math.PI * 2);
-        ctx.stroke();
+        // Optimal point
+        const optPt = curve.find(p => p.outp === optimalOutp);
+        if (optPt) {
+            const ox = xS(optPt.outp), oy = yS(optPt.profit);
+            // Glow
+            ctx.beginPath(); ctx.arc(ox, oy, 10, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(239,68,68,0.15)'; ctx.fill();
+            // Dot
+            ctx.beginPath(); ctx.arc(ox, oy, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#ef4444'; ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(ox, oy, 5, 0, Math.PI * 2); ctx.stroke();
+            // Label
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 11px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(`Optimal: ${optPt.outp} units → $${optPt.profit.toFixed(0)}`, ox, oy - 16);
+        }
 
         // X axis labels
         ctx.fillStyle = '#6b7280';
         ctx.font = '11px Inter, sans-serif';
         ctx.textAlign = 'center';
-        const step = Math.ceil(rangeX / 6);
-        for (let x = minX; x <= maxX; x += step) {
-            ctx.fillText(x, xScale(x), height - padding.bottom + 18);
-        }
+        const xTicks = niceScale(xMin, xMax, 6);
+        xTicks.forEach(v => {
+            ctx.fillText(Math.round(v), xS(v), height - pad.bottom + 20);
+        });
+        ctx.fillText('Order Up to Point (units)', width / 2, height - 6);
 
         // Y axis labels
         ctx.textAlign = 'right';
-        for (let i = 0; i <= 4; i++) {
-            const val = minY + (rangeY / 4) * (4 - i);
-            ctx.fillText('$' + val.toFixed(0), padding.left - 8, padding.top + (chartH / 4) * i + 4);
-        }
+        yTicks.forEach(v => {
+            ctx.fillText('$' + Math.round(v), pad.left - 8, yS(v) + 4);
+        });
+    }
 
-        // Axis labels
-        ctx.fillStyle = '#9ca3af';
-        ctx.font = '10px Inter, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Order Up to Point (units)', width / 2, height - 4);
+    function niceScale(min, max, ticks) {
+        const range = max - min || 1;
+        const rough = range / ticks;
+        const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+        const residual = rough / mag;
+        let nice;
+        if (residual <= 1.5) nice = mag;
+        else if (residual <= 3) nice = 2 * mag;
+        else if (residual <= 7) nice = 5 * mag;
+        else nice = 10 * mag;
+        const result = [];
+        let v = Math.ceil(min / nice) * nice;
+        while (v <= max) { result.push(v); v += nice; }
+        return result;
     }
 
     // === Load sample data button (if exists) ===

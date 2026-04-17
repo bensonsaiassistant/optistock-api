@@ -51,9 +51,24 @@ def get_outp_curve(
     if results.shape[0] > 1:
         results = results[1:]
 
-    # Downsample to ~50 points for efficient API response
-    n = len(results)
-    step = max(1, n // 50)
-    sampled = results[::step]
+    # Find peak profit and truncate curve shortly after it
+    peak_idx = int(np.argmax(results[:, 1]))
+    # Include a small buffer past peak (~10 units) for visual context
+    max_idx = min(peak_idx + 10, len(results) - 1)
+    # Only keep the relevant portion of the curve
+    relevant = results[:max_idx + 1]
+
+    # Downsample to ~40 points for efficient API response
+    n = len(relevant)
+    if n > 40:
+        step = max(1, n // 40)
+        sampled = relevant[::step]
+        # Ensure peak is included
+        peak_in_sample = any(int(s[0]) == int(results[peak_idx, 0]) for s in sampled)
+        if not peak_in_sample and peak_idx < n:
+            sampled = np.vstack([sampled, results[peak_idx:peak_idx+1]])
+            sampled = sampled[np.argsort(sampled[:, 0])]
+    else:
+        sampled = relevant
 
     return [{"outp": int(r[0]), "profit": float(r[1])} for r in sampled]
