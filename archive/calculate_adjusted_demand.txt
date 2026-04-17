@@ -1,0 +1,226 @@
+def calculate_adjusted_demand(df_in):
+    z_thresh14 = 2
+    z_thresh30 = 3.5
+    z_thresh60 = 6.5
+    z_thresh180 = 8
+    z_thresh365 = 12
+    z_thresh730 = 20
+    df = df_in.copy()
+    df = fill_dummy_data(df) # Filling in a years worth of in stock days with no sales so that new items don't look too crazy
+    # group on item * 1 if in stock and 0 otherwise. can only group on one thing with numba
+    # To fix problems with OOS purchasing (only thing in the data is a 1 so it's evaluating to 1) change this part so that past days are included for those ones
+    # min date for all data. 365-1 days ahead. quantity 0 and in stock (available) is 1 for every item
+    df['in_stock'] = np.where((df['available'] <= 0) & (df['quantity'] == 0), 0, 1)
+    df['item_group'] = df['item'] * df['in_stock']
+
+    df['pure_in_stock'] = np.where((df['available'] <= 0), 0, 1)
+    df['item_group_for_count'] = df['item'] * df['pure_in_stock']
+
+    # subtract mercury order qty from this so they aren't considered backorders
+    df['backorder_to_count'] = np.where((df['available'] <= 0) & (df['quantity'] - df['mercury_order_quantity'] > 0), 1, 0)
+    # df['quantity'] = np.where((df['available'] <= 0) & (df['quantity'] - df['mercury_order_quantity'] > 0), df['quantity'] * .5, df['quantity'])
+
+    df = df.sort_values(['item', 'date'])
+    df = df.reset_index(drop=True)
+
+    df['30_backorders'] = df.groupby('item_group')['backorder_to_count'].rolling(window=30, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['60_backorders'] = df.groupby('item_group')['backorder_to_count'].rolling(window=60, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['180_backorders'] = df.groupby('item_group')['backorder_to_count'].rolling(window=180, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['365_backorders'] = df.groupby('item_group')['backorder_to_count'].rolling(window=365, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['730_backorders'] = df.groupby('item_group')['backorder_to_count'].rolling(window=730, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+
+    df = df.sort_values(['item_group', 'date'])
+    df = df.reset_index(drop=True)
+
+    df['14 avg'] = df.groupby('item_group')['quantity'].rolling(window=14, min_periods=0).mean(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['14 var'] = df.groupby('item_group')['quantity'].rolling(window=14, min_periods=0).var(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['14 std'] = df.groupby('item_group')['quantity'].rolling(window=14, min_periods=0).std(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['14 zsc'] = (df['quantity'] - df['14 avg']) / df['14 std']
+    df['14 pct'] = df['quantity'] / df.groupby('item_group')['quantity'].rolling(window=14, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+
+    df['30 avg'] = df.groupby('item_group')['quantity'].rolling(window=30, min_periods=0).mean(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['30 var'] = df.groupby('item_group')['quantity'].rolling(window=30, min_periods=0).var(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['30 std'] = df.groupby('item_group')['quantity'].rolling(window=30, min_periods=0).std(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['30 zsc'] = (df['quantity'] - df['30 avg']) / df['30 std']
+    df['30 pct'] = df['quantity'] / df.groupby('item_group')['quantity'].rolling(window=30, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+
+    df['60 avg'] = df.groupby('item_group')['quantity'].rolling(window=60, min_periods=0).mean(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['60 var'] = df.groupby('item_group')['quantity'].rolling(window=60, min_periods=0).var(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['60 std'] = df.groupby('item_group')['quantity'].rolling(window=60, min_periods=0).std(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['60 zsc'] = (df['quantity'] - df['60 avg']) / df['60 std']
+    df['60 pct'] = df['quantity'] / df.groupby('item_group')['quantity'].rolling(window=60, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    
+    df['180 avg'] = df.groupby('item_group')['quantity'].rolling(window=180, min_periods=0).mean(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['180 var'] = df.groupby('item_group')['quantity'].rolling(window=180, min_periods=0).var(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['180 std'] = df.groupby('item_group')['quantity'].rolling(window=180, min_periods=0).std(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['180 zsc'] = (df['quantity'] - df['180 avg']) / df['180 std']
+    df['180 pct'] = df['quantity'] / df.groupby('item_group')['quantity'].rolling(window=180, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    
+    df['365 avg'] = df.groupby('item_group')['quantity'].rolling(window=365, min_periods=0).mean(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['365 var'] = df.groupby('item_group')['quantity'].rolling(window=365, min_periods=0).var(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['365 std'] = df.groupby('item_group')['quantity'].rolling(window=365, min_periods=0).std(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['365 zsc'] = (df['quantity'] - df['365 avg']) / df['365 std']
+    df['365 pct'] = df['quantity'] / df.groupby('item_group')['quantity'].rolling(window=365, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    
+    df['730 avg'] = df.groupby('item_group')['quantity'].rolling(window=730, min_periods=0).mean(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['730 var'] = df.groupby('item_group')['quantity'].rolling(window=730, min_periods=0).var(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['730 std'] = df.groupby('item_group')['quantity'].rolling(window=730, min_periods=0).std(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['730 zsc'] = (df['quantity'] - df['730 avg']) / df['730 std']
+    df['730 pct'] = df['quantity'] / df.groupby('item_group')['quantity'].rolling(window=730, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+
+    df['replacement_value'] = df.groupby('item_group')['60 avg'].shift().clip(lower=1).round(0).fillna(1)
+    df['adjusted_qty'] = df['quantity']
+
+    # df['adjusted_qty'] = np.where(df['14 zsc'] > z_thresh14, df['replacement_value'], df['adjusted_qty'])
+    # df['adjusted_qty'] = np.where(df['14 pct'] > 0.5, df['replacement_value'], df['adjusted_qty'])
+    # df['adjusted_qty'] = np.where(df['14 pct'] > 0.9, 1, df['adjusted_qty'])
+    #
+    # df['adjusted_qty'] = np.where(df['30 zsc'] > z_thresh30, df['replacement_value'], df['adjusted_qty'])
+    # df['adjusted_qty'] = np.where(df['30 pct'] > 0.5, df['replacement_value'], df['adjusted_qty'])
+    # df['adjusted_qty'] = np.where(df['30 pct'] > 0.9, 1, df['adjusted_qty'])
+    
+    df['adjusted_qty'] = np.where(df['60 zsc'] > z_thresh60, df['replacement_value'], df['adjusted_qty'])
+    df['adjusted_qty'] = np.where(df['60 pct'] > 0.5, df['replacement_value'], df['adjusted_qty'])
+    df['adjusted_qty'] = np.where(df['60 pct'] > 0.9, 1, df['adjusted_qty'])
+
+    df['adjusted_qty'] = np.where(df['180 zsc'] > z_thresh180, df['replacement_value'], df['adjusted_qty'])
+    df['adjusted_qty'] = np.where(df['180 pct'] > 0.5, df['replacement_value'], df['adjusted_qty'])
+    df['adjusted_qty'] = np.where(df['180 pct'] > 0.9, 1, df['adjusted_qty'])
+
+    df['adjusted_qty'] = np.where(df['365 zsc'] > z_thresh365, df['replacement_value'], df['adjusted_qty'])
+    df['adjusted_qty'] = np.where(df['365 pct'] > 0.5, df['replacement_value'], df['adjusted_qty'])
+    df['adjusted_qty'] = np.where(df['365 pct'] > 0.9, 1, df['adjusted_qty'])
+
+    df['adjusted_qty'] = np.where(df['730 zsc'] > z_thresh730, df['replacement_value'], df['adjusted_qty'])
+    df['adjusted_qty'] = np.where(df['730 pct'] > 0.5, df['replacement_value'], df['adjusted_qty'])
+    df['adjusted_qty'] = np.where(df['730 pct'] > 0.9, 1, df['adjusted_qty'])
+
+    df['14 adj_avg'] = df.groupby('item_group')['adjusted_qty'].rolling(window=14, min_periods=0).mean(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['30 adj_avg'] = df.groupby('item_group')['adjusted_qty'].rolling(window=30, min_periods=0).mean(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['60 adj_avg'] = df.groupby('item_group')['adjusted_qty'].rolling(window=60, min_periods=0).mean(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['180 adj_avg'] = df.groupby('item_group')['adjusted_qty'].rolling(window=180, min_periods=0).mean(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['365 adj_avg'] = df.groupby('item_group')['adjusted_qty'].rolling(window=365, min_periods=0).mean(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['730 adj_avg'] = df.groupby('item_group')['adjusted_qty'].rolling(window=730, min_periods=0).mean(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    
+    df['14 adj_var'] = df.groupby('item_group')['adjusted_qty'].rolling(window=14, min_periods=0).var(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['30 adj_var'] = df.groupby('item_group')['adjusted_qty'].rolling(window=30, min_periods=0).var(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['60 adj_var'] = df.groupby('item_group')['adjusted_qty'].rolling(window=60, min_periods=0).var(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['180 adj_var'] = df.groupby('item_group')['adjusted_qty'].rolling(window=180, min_periods=0).var(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['365 adj_var'] = df.groupby('item_group')['adjusted_qty'].rolling(window=365, min_periods=0).var(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['730 adj_var'] = df.groupby('item_group')['adjusted_qty'].rolling(window=730, min_periods=0).var(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+
+    df['non_zero'] = np.where(df['adjusted_qty'] != 0, 1, 0)
+
+    # df = df.sort_values(['item_group_for_count', 'date'])
+    # df = df.reset_index(drop=True)
+
+    # df['14 non_zero_ct'] = df.groupby('item_group_for_count')['non_zero'].rolling(window=14, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    # df['30 non_zero_ct'] = df.groupby('item_group_for_count')['non_zero'].rolling(window=30, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    # df['60 non_zero_ct'] = df.groupby('item_group_for_count')['non_zero'].rolling(window=60, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    # df['180 non_zero_ct'] = df.groupby('item_group_for_count')['non_zero'].rolling(window=180, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    # df['365 non_zero_ct'] = df.groupby('item_group_for_count')['non_zero'].rolling(window=365, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    # df['730 non_zero_ct'] = df.groupby('item_group_for_count')['non_zero'].rolling(window=730, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['14 non_zero_ct'] = df.groupby('item_group')['non_zero'].rolling(window=14, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['30 non_zero_ct'] = df.groupby('item_group')['non_zero'].rolling(window=30, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['60 non_zero_ct'] = df.groupby('item_group')['non_zero'].rolling(window=60, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['180 non_zero_ct'] = df.groupby('item_group')['non_zero'].rolling(window=180, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['365 non_zero_ct'] = df.groupby('item_group')['non_zero'].rolling(window=365, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+    df['730 non_zero_ct'] = df.groupby('item_group')['non_zero'].rolling(window=730, min_periods=0).sum(engine='numba', engine_kwargs={"parallel": True, "nopython": True}).reset_index(drop=True)
+
+    # Assign demand window based on order qty within windows
+    df['demand_window'] = np.where((df['365 adj_avg'] < (2 / 365)) | (df['365 non_zero_ct'] < 2), 4,
+                               np.where((df['180 adj_avg'] < (2 / 180)) | (df['180 non_zero_ct'] < 2), 3,
+                                        np.where((df['60 adj_avg'] < (2 / 60)) | (df['60 non_zero_ct'] < 2), 2,
+                                                 1)))
+
+    # increase demand window when there is a backorder
+    df['demand_window'] = np.where((df['demand_window'] == 1) & (df['60_backorders'] > 0) & (df['60 non_zero_ct'] < 5), df['demand_window'] + 1,
+                                   np.where((df['demand_window'] == 2) & (df['180_backorders'] > 0) & (df['180 non_zero_ct'] < 5), df['demand_window'] + 1,
+                                            np.where((df['demand_window'] == 3) & (df['365_backorders'] > 0) & (df['365 non_zero_ct'] < 5), df['demand_window'] + 1,
+                                                     df['demand_window'])))
+
+
+    df['final_avg'] = np.where(df['demand_window'] == 4, df['730 adj_avg'],
+                               np.where(df['demand_window'] == 3, (df['365 adj_avg']),
+                                        np.where(df['demand_window'] == 2, (df['180 adj_avg']),
+                                                 np.where(df['demand_window'] == 1, df['60 adj_avg'],
+                                                          df['60 adj_avg'])))).clip(min=0)
+    df['final_var'] = np.where(df['demand_window'] == 4, df['730 adj_var'],
+                               np.where(df['demand_window'] == 3, (df['365 adj_var']),
+                                        np.where(df['demand_window'] == 2, (df['180 adj_var']),
+                                                 np.where(df['demand_window'] == 1, df['60 adj_var'],
+                                                          df['60 adj_var'])))).clip(min=0)
+
+    # df.to_csv('748603 window_check.csv', index=False)
+
+
+    # USING 30 DAYS FOR RINNAI IF THERE'S ENOUGH SALES
+    # item_data = final_avg_edits()
+    # item_data = item_data[item_data['item'].isin(df['item'].to_list())]
+    # merge_data = df[df['item'].isin(item_data['item'].to_list())]
+    # merge_data = merge_data.merge(item_data, how='left', on=['item'])
+    # other_data = df[~(df['item'].isin(item_data['item'].to_list()))]
+    # df = pd.concat((merge_data, other_data))
+    # df.sort_values(['item_group', 'date'], inplace=True)
+    # df.reset_index(inplace=True, drop=True)
+    # df['final_avg'] = np.where(df['manufacturer'] == 'Rinnai',
+    #                            np.where(df['demand_window'] == 4, df['730 adj_avg'],
+    #                                     np.where(df['demand_window'] == 3,df['365 adj_avg'],
+    #                                              np.where(df['demand_window'] == 2,(df['180 adj_avg']),
+    #                                                       np.where((df['30 adj_avg'] < (2 / 60)) | (df['30 non_zero_ct'] < 2), (df['60 adj_avg']),
+    #                                                                (df['30 adj_avg']))))).clip(min=0), df['final_avg'])
+    # df['final_var'] = np.where(df['manufacturer'] == 'Rinnai',
+    #                            np.where(df['demand_window'] == 4, df['730 adj_var'],
+    #                                     np.where(df['demand_window'] == 3,(df['365 adj_var']),
+    #                                              np.where(df['demand_window'] == 2,(df['180 adj_var']),
+    #                                                       np.where((df['30 adj_avg'] < (2 / 60)) | (df['30 non_zero_ct'] < 2), (df['60 adj_var']),
+    #                                                                (df['30 adj_var']))))).clip(min=0), df['final_var'])
+
+    # df['final_avg'] = np.where(df['demand_override'] == 'T', df['14 adj_avg'], df['final_avg'])
+    # df['final_var'] = np.where(df['demand_override'] == 'T', df['14 adj_var'], df['final_var'])
+
+    # df.to_csv('adjusted_demand_pre_drop.csv', index=False)
+    # csv_data = df.sort_values(['item', 'date'])
+    # csv_data['final_avg'] = csv_data['final_avg'].ffill ()
+    # csv_data['final_var'] = csv_data['final_var'].ffill()
+    # csv_data = csv_data.drop_duplicates(subset=['item'], keep = 'last')
+    # csv_data.to_csv('asjusted_demand_last_only.csv', index=False)
+    # df = df.drop(columns=['demand_override', 'manufacturer'])
+
+    df = df.drop(columns=['14 non_zero_ct', '30 non_zero_ct', '14 adj_var', '30 adj_var',
+                 '14 adj_avg', '30 adj_avg', '14 avg', '14 var', '14 std', '14 zsc', '14 pct',
+                 '30 avg', '30 var', '30 std', '30 zsc', '30 pct', 'pure_in_stock', 'item_group_for_count',
+                 'backorder_to_count', '30_backorders', '60_backorders', '180_backorders', '365_backorders',
+                 '730_backorders', 'demand_window'])
+
+
+    df['final_var'] = np.where(df['final_var'] < df['final_avg'], df['final_avg'], df['final_var'])
+
+    columns_to_update = [
+        '60 avg', '60 var', '60 std', '60 zsc', '60 pct',
+        '180 avg', '180 var', '180 std', '180 zsc', '180 pct',
+        '365 avg', '365 var', '365 std', '365 zsc', '365 pct',
+        '730 avg', '730 var', '730 std', '730 zsc', '730 pct',
+        'replacement_value', 'adjusted_qty',
+        '60 adj_avg', '180 adj_avg', '365 adj_avg', '730 adj_avg',
+        '60 adj_var', '180 adj_var', '365 adj_var', '730 adj_var', 'non_zero',
+        '60 non_zero_ct', '180 non_zero_ct', '365 non_zero_ct', '730 non_zero_ct',
+        'final_avg', 'final_var'
+    ]
+
+    df = df.sort_values(['item', 'date'])
+    df.reset_index(drop=True, inplace=True)
+
+
+    # REMOVING DUMMY ROWS. MIN DATE IS A GLOBAL VAR
+    df = df[df['date'] >= min_date]
+
+    for col in columns_to_update:
+        df[col] = np.where(df['in_stock'] == 0, np.nan, df[col])
+        df[col] = df.groupby('item')[col].ffill().fillna(0)
+        values = df[col].values
+        if is_almost_integer(values):
+            df[col] = pd.to_numeric(values.round().astype(int), downcast='integer')
+        else:
+            df[col] = pd.to_numeric(values, downcast='float')
+    return df
